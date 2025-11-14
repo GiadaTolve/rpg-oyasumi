@@ -1899,39 +1899,63 @@ app.get('/api/daily-event', verificaToken, async (req, res) => {
 // --- BLOCCO API MESSAGGISTICA PRIVATA ---
 // =================================================================
 
-// Prende la lista di tutte le conversazioni dell'utente
+// Prende la lista di tutte le conversazioni dell'utente (RISCRITTA PER STABILITÀ QBD)
 app.get('/api/pm/conversations', verificaToken, async (req, res) => {
     try {
         const myId = req.utente.id;
-        
-        // La query RAW è stata riscritta per usare i placeholders standard (?) 
-        // ed è accoppiata con 10 bindings di myId.
-        const result = await db.raw(`
-            SELECT
-                u.id_utente,
-                u.nome_pg,
-                u.avatar_chat,
-                -- Ottiene l'ultimo messaggio tra i due utenti
-                (SELECT text FROM private_messages WHERE (sender_id = u.id_utente AND receiver_id = ?) OR (sender_id = ? AND receiver_id = u.id_utente) ORDER BY timestamp DESC LIMIT 1) as last_message,
-                -- Ottiene il timestamp dell'ultimo messaggio
-                (SELECT timestamp FROM private_messages WHERE (sender_id = u.id_utente AND receiver_id = ?) OR (sender_id = ? AND receiver_id = u.id_utente) ORDER BY timestamp DESC LIMIT 1) as last_message_timestamp,
-                -- Conta i messaggi non letti inviati dall'altro utente
-                (SELECT COUNT(*) FROM private_messages WHERE sender_id = u.id_utente AND receiver_id = ? AND is_read = 0) as unread_count
-            FROM (
-                -- Seleziona tutti gli ID degli utenti con cui ho avuto una conversazione
-                SELECT DISTINCT CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END as user_id
-                FROM private_messages WHERE sender_id = ? OR receiver_id = ?
-            ) as conv
-            JOIN utenti u ON conv.user_id = u.id_utente
-            ORDER BY last_message_timestamp DESC`
-            , [myId, myId, myId, myId, myId, myId, myId, myId, myId, myId]); // 10 bindings
-        
-        // Knex con PostgreSQL restituisce l'array in 'rows'
-        const conversations = result.rows || result; 
+
+        // 1. Trova tutti gli ID utente con cui l'utente loggato ha una conversazione
+        // (Identifica i partner di chat in modo dinamico)
+        const conversationPartners = await db('private_messages')
+            .distinct(db.raw(`CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END as user_id`, [myId]))
+            .where('sender_id', myId)
+            .orWhere('receiver_id', myId)
+            .pluck('user_id'); // Ritorna solo un array di ID
+
+        // Se non ci sono conversazioni, restituisci un array vuoto
+        if (conversationPartners.length === 0) {
+            return res.json([]);
+        }
+
+        // 2. Costruisci la query principale utilizzando gli ID trovati
+        const conversations = await db('utenti as u')
+            .select([
+                'u.id_utente',
+                'u.nome_pg',
+                'u.avatar_chat',
+                // Sottoquery per l'ultimo messaggio (deve essere raw per l'ORDER BY nel subquery)
+                db.raw(`
+                    (SELECT text 
+                     FROM private_messages 
+                     WHERE (sender_id = u.id_utente AND receiver_id = ?) OR (sender_id = ? AND receiver_id = u.id_utente)
+                     ORDER BY timestamp DESC 
+                     LIMIT 1
+                    ) as last_message
+                `, [myId, myId]),
+                db.raw(`
+                    (SELECT timestamp 
+                     FROM private_messages 
+                     WHERE (sender_id = u.id_utente AND receiver_id = ?) OR (sender_id = ? AND receiver_id = u.id_utente)
+                     ORDER BY timestamp DESC 
+                     LIMIT 1
+                    ) as last_message_timestamp
+                `, [myId, myId]),
+                // Sottoquery per i messaggi non letti
+                db.raw(`
+                    (SELECT COUNT(*) 
+                     FROM private_messages 
+                     WHERE sender_id = u.id_utente AND receiver_id = ? AND is_read = 0
+                    ) as unread_count
+                `, [myId])
+            ])
+            .whereIn('u.id_utente', conversationPartners) // Filtra solo gli utenti che hanno chattato
+            .orderBy(db.raw('last_message_timestamp'), 'desc'); // Ordina per la colonna RAW
+
         res.json(conversations);
+
     } catch (error) {
-        console.error("Errore recupero conversazioni:", error);
-        res.status(500).json({ message: "Errore interno del server." });
+        console.error("ERRORE CRITICO RECUPERO CONVERSAZIONI (PM):", error);
+        res.status(500).json({ message: "Errore interno del server durante il recupero dei PM." });
     }
 });
 
