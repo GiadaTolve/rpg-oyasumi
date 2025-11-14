@@ -83,4 +83,82 @@ exports.seed = async function(knex) {
      { id: 7, name: 'uhiuhihiuhh', type: 'BATTLE', status: 'CONCLUSA', master_id: 2 },
      { id: 8, name: 'Ciao a tutti.', type: 'TRAMA', status: 'CONCLUSA', master_id: 2 }
   ]);
+
+  // --- AGGIUNGI QUESTO ALLA FINE ---
+// Questo comando aggiorna i contatori degli ID di PostgreSQL
+// per evitare conflitti dopo il seed.
+console.log("Aggiornamento delle sequenze del database...");
+
+// Usiamo 'TRUNCATE ... RESTART IDENTITY' per pulire E resettare i contatori
+// È più pulito che fare .del() e poi .raw()
+
+await knex.raw('TRUNCATE TABLE utenti, locations, quests, forum_sezioni, forum_bacheche, forum_topics, forum_posts RESTART IDENTITY CASCADE');
+
+// Ora reinseriamo tutto, e gli ID saranno gestiti automaticamente da Postgres
+
+console.log("Reinserimento dati seed...");
+
+await knex('utenti').insert([
+  { 
+    email: 'aramis@test.com', 
+    password: '$2b$10$Vu8LWpt6Eqlrv8g745H1peO3yfGRD3h7iandxnwFOUYIVKbti.f7u', 
+    nome_pg: 'Aramis', 
+    permesso: 'PLAYER',
+    exp: 100,
+    exp_accumulata: 100 
+  },
+  { 
+    email: 'kagetsu@test.com', 
+    password: '$2b$10$WRxl4YIhybf/dPZ.hpW4Ku7H3Sos6JsY1RJjXMUxhrVM6cTU3N8AG', 
+    nome_pg: 'Kagetsu', 
+    permesso: 'ADMIN',
+    exp: 200,
+    exp_accumulata: 200 
+  }
+]);
+
+await knex('locations').insert([
+  { name: 'Mappa Zero', type: 'MAP', image_url: '/maps/map.png', pos_x: 22, pos_y: 30 },
+  { parent_id: 1, name: 'Altrove', type: 'MAP', image_url: 'maps/map.wasted.png', pos_x: 45, pos_y: 55 },
+  { parent_id: 1, name: 'Ezochi', type: 'MAP', image_url: 'maps/map.ezochi.png', pos_x: 75, pos_y: 30 },
+  { parent_id: 1, name: 'Onimori', type: 'MAP', image_url: 'maps/map.onimori.png', pos_x: 35, pos_y: 40 },
+  { parent_id: 1, name: 'Izayoi', type: 'MAP', image_url: 'maps/map.izayoi.png', pos_x: 30, pos_y: 70 },
+  { parent_id: 1, name: 'Ogōn', type: 'MAP', image_url: '/maps/map.ogon.png', pos_x: 88, pos_y: 50 }
+]);
+
+await knex('forum_sezioni').insert([
+  { nome: 'off-game' },
+  { nome: 'on-game' },
+  { nome: 'hot-topic' }
+]);
+
+await knex('forum_bacheche').insert([
+  { sezione_id: 1, nome: 'news-game', is_locked: 0 } 
+]);
+
+await knex('forum_topics').insert([
+  { bacheca_id: 1, autore_id: 2, titolo: 'A tutte le unità!', is_pinned: 1 },
+  { bacheca_id: 1, autore_id: 2, titolo: 'Ciao a tutti', is_pinned: 0 },
+  { bacheca_id: 1, autore_id: 2, titolo: 'Provo il visore', is_pinned: 0 }
+]);
+
+await knex('forum_posts').insert([
+  { topic_id: 1, autore_id: 2, testo: 'ciao' },
+  { topic_id: 2, autore_id: 2, testo: 'Sono nuovo!' },
+  { topic_id: 3, autore_id: 2, testo: 'Eh qui tocca provare il visore, [b]per forza[/b].\nQuindi ora mi metto a fare un lunghissimo spiegone su qualcosa a caso.' },
+]);
+
+await knex('quests').insert([
+   { name: 'Canti di Sangue', type: 'TRAMA', status: 'IN_CORSO', master_id: 2, filone_name: 'L\'occhio nel Cielo' },
+   { name: 'Lune di Sangue', type: 'TRAMA', status: 'CONCLUSA', master_id: 2 },
+   { name: 'Prova1', type: 'BATTLE', status: 'CONCLUSA', master_id: 2 },
+   { name: 'Prova3', type: 'BATTLE', status: 'CONCLUSA', master_id: 2 },
+   { name: 'Ciao...', type: 'TRAMA', status: 'CONCLUSA', master_id: 2 },
+   { name: 'Lame e Urla', type: 'AMBIENT', status: 'CONCLUSA', master_id: 2 },
+   { name: 'uhiuhihiuhh', type: 'BATTLE', status: 'CONCLUSA', master_id: 2 },
+   { name: 'Ciao a tutti.', type: 'TRAMA', status: 'CONCLUSA', master_id: 2 }
+]);
+
+console.log("Dati reinseriti e sequenze aggiornate.");
+
 };
