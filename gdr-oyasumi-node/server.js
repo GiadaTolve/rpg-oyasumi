@@ -1899,21 +1899,27 @@ app.get('/api/daily-event', verificaToken, async (req, res) => {
 // --- BLOCCO API MESSAGGISTICA PRIVATA ---
 // =================================================================
 
-// Prende la lista di tutte le conversazioni dell'utente (RISCRITTA PER STABILITÀ QBD)
+// Prende la lista di tutte le conversazioni dell'utente (RISCRITTA PER STABILITÀ)
 app.get('/api/pm/conversations', verificaToken, async (req, res) => {
     try {
         const myId = req.utente.id;
 
-        // 1. Trova tutti gli ID utente con cui l'utente loggato ha una conversazione
-        // (Identifica i partner di chat in modo dinamico)
-        const conversationPartners = await db('private_messages')
-            .distinct(db.raw(`CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END as user_id`, [myId]))
+        // 1. Trova tutti gli ID utente con cui l'utente loggato ha una conversazione (Più robusto)
+        // Usiamo un subquery per ottenere tutti i partner ID distinti, e poi .pluck() per trasformarlo in un array semplice.
+        const partnerIds = await db('private_messages')
+            .select(db.raw(`
+                CASE 
+                    WHEN sender_id = ? THEN receiver_id 
+                    ELSE sender_id 
+                END as partner_id
+            `, [myId]))
             .where('sender_id', myId)
             .orWhere('receiver_id', myId)
-            .pluck('user_id'); // Ritorna solo un array di ID
+            .groupBy('partner_id') // Raggruppa per avere ID distinti
+            .pluck('partner_id'); 
 
         // Se non ci sono conversazioni, restituisci un array vuoto
-        if (conversationPartners.length === 0) {
+        if (partnerIds.length === 0) {
             return res.json([]);
         }
 
@@ -1948,12 +1954,13 @@ app.get('/api/pm/conversations', verificaToken, async (req, res) => {
                     ) as unread_count
                 `, [myId])
             ])
-            .whereIn('u.id_utente', conversationPartners) // Filtra solo gli utenti che hanno chattato
-            .orderBy(db.raw('last_message_timestamp'), 'desc'); // Ordina per la colonna RAW
+            .whereIn('u.id_utente', partnerIds) // <-- USA LA LISTA DI ID PARTNER
+            .orderBy(db.raw('last_message_timestamp'), 'desc'); 
 
         res.json(conversations);
 
     } catch (error) {
+        // L'ERRORE NON È PIÙ 'column user_id does not exist' con questa logica.
         console.error("ERRORE CRITICO RECUPERO CONVERSAZIONI (PM):", error);
         res.status(500).json({ message: "Errore interno del server durante il recupero dei PM." });
     }
