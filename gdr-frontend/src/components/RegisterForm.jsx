@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../api';
 import './ChatRegister.css';
 
@@ -173,6 +173,25 @@ function RegisterForm({ onRegisterSuccess, openGuida, openLore }) {
         activeTimers.current = [];
     };
 
+    // --- NUOVA FUNZIONE SKIP ---
+    const handleSkip = () => {
+        clearAllTimers();
+        setIsYumeTyping(false);
+        setIsInputDisabled(true);
+        setUserData(p => ({
+            ...p,
+            nomePg: 'NemuRyu', // Default name
+            playerPreferences: 'SALTARE-TEST', // Default pref
+        }));
+        
+        // Salta direttamente allo Step 8 (Email)
+        playMessageSequence(conversationFlow[8].messages, () => {
+            setStep(8);
+            setIsInputDisabled(false);
+        });
+    };
+    // --- FINE NUOVA FUNZIONE SKIP ---
+
     // Effetto per avviare la conversazione
     useEffect(() => {
         playMessageSequence(conversationFlow[0].messages, () => {
@@ -293,7 +312,7 @@ function RegisterForm({ onRegisterSuccess, openGuida, openLore }) {
         }
     };
   
-    const getInputType = () => (step === 11 || step === 12) ? 'password' : 'text';
+    const getInputType = () => (step === 9 || step === 10) ? 'password' : 'text';
     const getPlaceholderText = () => {
         if (isTerminated) return 'Registrazione non possibile.';
         if (isComplete) return 'Registrazione completata!';
@@ -303,7 +322,24 @@ function RegisterForm({ onRegisterSuccess, openGuida, openLore }) {
 
     return (
         <div className="chat-register-container">
-            <div className="chat-header"><h2>Parla con Yume-chan</h2><img src="/yumechan/iconayumetalk.png" alt="Yume-chan" className="yume-icon" /></div>
+            <div className="chat-header">
+                <h2>Parla con Yume-chan</h2>
+                <img src="/yumechan/iconayumetalk.png" alt="Yume-chan" className="yume-icon" />
+                {step < 8 && !isComplete && !isTerminated && (
+                    <button className="skip-button" onClick={handleSkip} disabled={isYumeTyping} style={{
+                        marginLeft: 'auto',
+                        padding: '5px 10px',
+                        background: '#60519b',
+                        color: 'white',
+                        border: '1px solid #7d6ed1',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                    }}>
+                        [Salta Animazione]
+                    </button>
+                )}
+            </div>
             <div className="chat-messages">
                 {messages.map((msg, index) => (<div key={index} className={`message-bubble ${msg.sender}`}><p>{msg.content}</p></div>))}
                 {isYumeTyping && <div className="message-bubble yume typing-indicator"><span>.</span><span>.</span><span>.</span></div>}
