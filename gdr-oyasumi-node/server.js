@@ -1901,32 +1901,37 @@ app.get('/api/daily-event', verificaToken, async (req, res) => {
 
 // Prende la lista di tutte le conversazioni dell'utente
 app.get('/api/pm/conversations', verificaToken, async (req, res) => {
-    try {
-        const myId = req.utente.id;
-        // db.raw è corretto qui perché la query è complessa e usa sintassi specifiche
-        const result = await db.raw(`
-            SELECT
-                u.id_utente,
-                u.nome_pg,
-                u.avatar_chat,
-                (SELECT text FROM private_messages WHERE (sender_id = u.id_utente AND receiver_id = :myId) OR (sender_id = :myId AND receiver_id = u.id_utente) ORDER BY timestamp DESC LIMIT 1) as last_message,
-                (SELECT timestamp FROM private_messages WHERE (sender_id = u.id_utente AND receiver_id = :myId) OR (sender_id = :myId AND receiver_id = u.id_utente) ORDER BY timestamp DESC LIMIT 1) as last_message_timestamp,
-                (SELECT COUNT(*) FROM private_messages WHERE sender_id = u.id_utente AND receiver_id = :myId AND is_read = 0) as unread_count
-            FROM (
-                SELECT DISTINCT CASE WHEN sender_id = :myId THEN receiver_id ELSE sender_id END as user_id
-                FROM private_messages WHERE sender_id = :myId OR receiver_id = :myId
-            ) as conv
-            JOIN utenti u ON conv.user_id = u.id_utente
-            ORDER BY last_message_timestamp DESC
-        `, { myId });
-        
+    try {
+        const myId = req.utente.id;
+        
+        // CORREZIONE: Usiamo i placeholders standard (?) con 10 binding [myId]
+        const result = await db.raw(`
+            SELECT
+                u.id_utente,
+                u.nome_pg,
+                u.avatar_chat,
+                -- Ottiene l'ultimo messaggio tra i due utenti
+                (SELECT text FROM private_messages WHERE (sender_id = u.id_utente AND receiver_id = ?) OR (sender_id = ? AND receiver_id = u.id_utente) ORDER BY timestamp DESC LIMIT 1) as last_message,
+                -- Ottiene il timestamp dell'ultimo messaggio
+                (SELECT timestamp FROM private_messages WHERE (sender_id = u.id_utente AND receiver_id = ?) OR (sender_id = ? AND receiver_id = u.id_utente) ORDER BY timestamp DESC LIMIT 1) as last_message_timestamp,
+                -- Conta i messaggi non letti inviati dall'altro utente
+                (SELECT COUNT(*) FROM private_messages WHERE sender_id = u.id_utente AND receiver_id = ? AND is_read = 0) as unread_count
+            FROM (
+                -- Seleziona tutti gli ID degli utenti con cui ho avuto una conversazione
+                SELECT DISTINCT CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END as user_id
+                FROM private_messages WHERE sender_id = ? OR receiver_id = ?
+            ) as conv
+            JOIN utenti u ON conv.user_id = u.id_utente
+            ORDER BY last_message_timestamp DESC
+        `, [myId, myId, myId, myId, myId, myId, myId, myId, myId, myId]);
+        
         // Knex con PostgreSQL restituisce l'array in 'rows'
-        const conversations = result.rows || result; 
-        res.json(conversations);
-    } catch (error) {
-        console.error("Errore recupero conversazioni:", error);
-        res.status(500).json({ message: "Errore interno del server." });
-    }
+        const conversations = result.rows || result; 
+        res.json(conversations);
+    } catch (error) {
+        console.error("Errore recupero conversazioni:", error);
+        res.status(500).json({ message: "Errore interno del server." });
+    }
 });
 
 // Prende la cronologia di una singola conversazione e la segna come letta
@@ -1960,7 +1965,7 @@ app.get('/api/pm/conversation/:userId', verificaToken, async (req, res) => {
     }
 });
 
-// FINE MESSAGGI PRIVATI 
+// FINE MESSAGGI PRIVATI
 
 
 // --- 5. AVVIO DELL'APPLICAZIONE ---
