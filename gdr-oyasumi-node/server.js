@@ -1904,7 +1904,8 @@ app.get('/api/pm/conversations', verificaToken, async (req, res) => {
     try {
         const myId = req.utente.id;
         
-        // CORREZIONE: Usiamo i placeholders standard (?) con 10 binding [myId]
+        // La query RAW è stata riscritta per usare i placeholders standard (?) 
+        // ed è accoppiata con 10 bindings di myId.
         const result = await db.raw(`
             SELECT
                 u.id_utente,
@@ -1923,7 +1924,7 @@ app.get('/api/pm/conversations', verificaToken, async (req, res) => {
             ) as conv
             JOIN utenti u ON conv.user_id = u.id_utente
             ORDER BY last_message_timestamp DESC
-        `, [myId, myId, myId, myId, myId, myId, myId, myId, myId, myId]);
+        `, [myId, myId, myId, myId, myId, myId, myId, myId, myId, myId]); // 10 bindings
         
         // Knex con PostgreSQL restituisce l'array in 'rows'
         const conversations = result.rows || result; 
