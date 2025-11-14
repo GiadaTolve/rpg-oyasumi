@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api';
-// --- ECCO LA CORREZIONE ---
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 // --- STILI ---
@@ -218,7 +217,7 @@ function Gestione({ user }) {
 
     switch (activeModule) {
       case 'users': return (<div><h2 style={styles.contentTitle}>Gestione Utenti</h2><UserManagement /></div>);
-      case 'logs': return (<div><h2 style{styles.contentTitle}>Visualizzatore Log</h2><LogViewer /></div>);
+      case 'logs': return (<div><h2 style={styles.contentTitle}>Visualizzatore Log</h2><LogViewer /></div>);
       case 'maps': return (<div><h2 style={styles.contentTitle}>Gestione Mappe</h2><MapManagement /></div>);
       case 'forum': return (<div><h2 style={styles.contentTitle}>Gestione Forum</h2><ForumManagement /></div>);
       case 'banners': return (<div><h2 style={styles.contentTitle}>Gestione Banner</h2><BannerManagement /></div>);
