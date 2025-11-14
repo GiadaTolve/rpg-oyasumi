@@ -1923,8 +1923,8 @@ app.get('/api/pm/conversations', verificaToken, async (req, res) => {
                 FROM private_messages WHERE sender_id = ? OR receiver_id = ?
             ) as conv
             JOIN utenti u ON conv.user_id = u.id_utente
-            ORDER BY last_message_timestamp DESC
-        `, [myId, myId, myId, myId, myId, myId, myId, myId, myId, myId]); // 10 bindings
+            ORDER BY last_message_timestamp DESC`
+            , [myId, myId, myId, myId, myId, myId, myId, myId, myId, myId]); // 10 bindings
         
         // Knex con PostgreSQL restituisce l'array in 'rows'
         const conversations = result.rows || result; 
