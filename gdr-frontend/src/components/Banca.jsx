@@ -106,13 +106,37 @@ function Banca({ user, onClose }) {
     }, [isDragging, handleMouseMove, handleMouseUp]);
 
     const showToaster = (message, image = null) => { setToaster({ show: true, message, image }); };
-    const handleSetJob = async (jobName) => { if (window.confirm(`Sei sicuro di voler diventare ${jobName}? La scelta è definitiva.`)) { try { const response = await api.post('/api/bank/set-job', { jobName }); showToaster(response.data.message); fetchAccountData(); } catch (error) { showToaster(error.response?.data?.message || "Errore."); } } };
-    const handleCollectSalary = async () => { try { const response = await api.post('/api/bank/collect-salary'); showToaster(response.data.message); fetchAccountData(); } catch (error) { showToaster(error.response?.data?.message || "Errore."); } };
+    
+    // --- CORREZIONE 1: Rimosso /api/ ---
+    const handleSetJob = async (jobName) => { 
+        if (window.confirm(`Sei sicuro di voler diventare ${jobName}? La scelta è definitiva.`)) { 
+            try { 
+                const response = await api.post('/bank/set-job', { jobName }); 
+                showToaster(response.data.message); 
+                fetchAccountData(); 
+            } catch (error) { 
+                showToaster(error.response?.data?.message || "Errore."); 
+            } 
+        } 
+    };
+    
+    // --- CORREZIONE 2: Rimosso /api/ ---
+    const handleCollectSalary = async () => { 
+        try { 
+            const response = await api.post('/bank/collect-salary');
+            showToaster(response.data.message); 
+            fetchAccountData(); 
+        } catch (error) { 
+            showToaster(error.response?.data?.message || "Errore."); 
+        } 
+    };
+    
     const handleTransferChange = (e) => setTransferData({ ...transferData, [e.target.name]: e.target.value });
     const handleTransferSubmit = async (e) => {
         e.preventDefault();
         if (!transferData.receiverName || !transferData.amount || !transferData.reason) { return showToaster("Compila tutti i campi."); }
         try {
+            // Nota: /bank/transfer era già corretto
             const response = await api.post('/bank/transfer', { ...transferData, amount: parseInt(transferData.amount, 10) });
             showToaster(response.data.message);
             setTransferData({ receiverName: '', amount: '', reason: '' });
