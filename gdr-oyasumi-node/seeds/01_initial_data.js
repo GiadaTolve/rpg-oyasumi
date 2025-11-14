@@ -42,7 +42,7 @@ exports.seed = async function(knex) {
     { id: 1, parent_id: null, name: 'Mappa Zero', type: 'MAP', image_url: '/maps/map.png', pos_x: 22, pos_y: 30 },
     { id: 2, parent_id: 1, name: 'Altrove', type: 'MAP', image_url: 'maps/map.wasted.png', pos_x: 45, pos_y: 55 },
     { id: 3, parent_id: 1, name: 'Ezochi', type: 'MAP', image_url: 'maps/map.ezochi.png', pos_x: 75, pos_y: 30 },
-    { id: 4, parent_id: 1, name: 'Onimori', type: 'MAP', image_url: 'maps/map.onimori.png', pos_x: 35.4, pos_y: 40 },
+    { id: 4, parent_id: 1, name: 'Onimori', type: 'MAP', image_url: 'maps/map.onimori.png', pos_x: 35, pos_y: 40 },
     { id: 5, parent_id: 1, name: 'Izayoi', type: 'MAP', image_url: 'maps/map.izayoi.png', pos_x: 30, pos_y: 70 },
     { id: 6, parent_id: 1, name: 'Ogōn', type: 'MAP', image_url: '/maps/map.ogon.png', pos_x: 88, pos_y: 50 }
   ]);
