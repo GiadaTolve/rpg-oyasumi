@@ -1896,108 +1896,141 @@ app.get('/api/daily-event', verificaToken, async (req, res) => {
 });
 
 // =================================================================
-// --- BLOCCO API MESSAGGISTICA PRIVATA ---
+// --- BLOCCO API MESSAGGISTICA PRIVATA (VERSIONE FIX POSTGRESQL) ---
 // =================================================================
 
-// Prende la lista di tutte le conversazioni dell'utente (RISCRITTA PER STABILITÀ)
+// Prende la lista di tutte le conversazioni dell'utente
 app.get('/api/pm/conversations', verificaToken, async (req, res) => {
     try {
         const myId = req.utente.id;
 
-        // 1. Trova tutti gli ID utente con cui l'utente loggato ha una conversazione (Più robusto)
-        // Usiamo un subquery per ottenere tutti i partner ID distinti, e poi .pluck() per trasformarlo in un array semplice.
-        const partnerIds = await db('private_messages')
-            .select(db.raw(`
-                CASE 
-                    WHEN sender_id = ? THEN receiver_id 
-                    ELSE sender_id 
-                END as partner_id
-            `, [myId]))
-            .where('sender_id', myId)
-            .orWhere('receiver_id', myId)
-            .groupBy('partner_id') // Raggruppa per avere ID distinti
-            .pluck('partner_id'); 
+        // 1️⃣ Subquery per ottenere gli ID partner in modo compatibile con PostgreSQL
+        const partnerIds = await db
+            .from(function () {
+                this.select(
+                    db.raw(`
+                        CASE 
+                            WHEN sender_id = ? THEN receiver_id
+                            ELSE sender_id
+                        END AS partner_id
+                    `, [myId])
+                )
+                .from('private_messages')
+                .where('sender_id', myId)
+                .orWhere('receiver_id', myId)
+                .as('sub_pm');
+            })
+            .distinct()
+            .pluck('partner_id');
 
-        // Se non ci sono conversazioni, restituisci un array vuoto
+        // Nessuna conversazione → restituisci array vuoto
         if (partnerIds.length === 0) {
             return res.json([]);
         }
 
-        // 2. Costruisci la query principale utilizzando gli ID trovati
+        // 2️⃣ Recupera i dati delle conversazioni
         const conversations = await db('utenti as u')
             .select([
                 'u.id_utente',
                 'u.nome_pg',
                 'u.avatar_chat',
-                // Sottoquery per l'ultimo messaggio (deve essere raw per l'ORDER BY nel subquery)
+
+                // ultimo messaggio
                 db.raw(`
                     (SELECT text 
                      FROM private_messages 
-                     WHERE (sender_id = u.id_utente AND receiver_id = ?) OR (sender_id = ? AND receiver_id = u.id_utente)
+                     WHERE (sender_id = u.id_utente AND receiver_id = ?) 
+                        OR (sender_id = ? AND receiver_id = u.id_utente)
                      ORDER BY timestamp DESC 
                      LIMIT 1
-                    ) as last_message
+                    ) AS last_message
                 `, [myId, myId]),
+
+                // timestamp ultimo messaggio
                 db.raw(`
                     (SELECT timestamp 
                      FROM private_messages 
-                     WHERE (sender_id = u.id_utente AND receiver_id = ?) OR (sender_id = ? AND receiver_id = u.id_utente)
+                     WHERE (sender_id = u.id_utente AND receiver_id = ?) 
+                        OR (sender_id = ? AND receiver_id = u.id_utente)
                      ORDER BY timestamp DESC 
                      LIMIT 1
-                    ) as last_message_timestamp
+                    ) AS last_message_timestamp
                 `, [myId, myId]),
-                // Sottoquery per i messaggi non letti
+
+                // conteggio non letti
                 db.raw(`
                     (SELECT COUNT(*) 
                      FROM private_messages 
-                     WHERE sender_id = u.id_utente AND receiver_id = ? AND is_read = 0
-                    ) as unread_count
+                     WHERE sender_id = u.id_utente 
+                       AND receiver_id = ? 
+                       AND is_read = 0
+                    ) AS unread_count
                 `, [myId])
             ])
-            .whereIn('u.id_utente', partnerIds) // <-- USA LA LISTA DI ID PARTNER
-            .orderBy(db.raw('last_message_timestamp'), 'desc'); 
+            .whereIn('u.id_utente', partnerIds)
+            .orderBy(db.raw('last_message_timestamp'), 'desc');
 
         res.json(conversations);
 
     } catch (error) {
-        // L'ERRORE NON È PIÙ 'column user_id does not exist' con questa logica.
         console.error("ERRORE CRITICO RECUPERO CONVERSAZIONI (PM):", error);
         res.status(500).json({ message: "Errore interno del server durante il recupero dei PM." });
     }
 });
 
-// Prende la cronologia di una singola conversazione e la segna come letta
+// -----------------------------------------------------------------
+// Prende la cronologia completa di una conversazione + segna letti
+// -----------------------------------------------------------------
 app.get('/api/pm/conversation/:userId', verificaToken, async (req, res) => {
-    const myId = req.utente.id;
-    const otherUserId = req.params.userId;
+    const myId = req.utente.id;
+    const otherUserId = req.params.userId;
 
-    try {
-        const messages = await db.transaction(async (trx) => {
-            const msgs = await trx('private_messages as pm')
-                .join('utenti as s', 'pm.sender_id', 's.id_utente')
-                .select('pm.*', 's.nome_pg as sender_name', 's.avatar_chat as sender_avatar')
-                .where(function() {
-                    this.where({ 'pm.sender_id': myId, 'pm.receiver_id': otherUserId })
-                        .orWhere({ 'pm.sender_id': otherUserId, 'pm.receiver_id': myId });
-                })
-                .orderBy('pm.timestamp', 'asc');
+    try {
+        const messages = await db.transaction(async (trx) => {
 
-            // Segna i messaggi come letti
-            await trx('private_messages')
-                .where({ sender_id: otherUserId, receiver_id: myId, is_read: 0 })
-                .update({ is_read: 1 });
-            
-            return msgs;
-        });
+            // 1️⃣ Recupera messaggi in ordine cronologico
+            const msgs = await trx('private_messages as pm')
+                .join('utenti as s', 'pm.sender_id', 's.id_utente')
+                .select(
+                    'pm.*',
+                    's.nome_pg as sender_name',
+                    's.avatar_chat as sender_avatar'
+                )
+                .where(function () {
+                    this.where({
+                        'pm.sender_id': myId,
+                        'pm.receiver_id': otherUserId
+                    }).orWhere({
+                        'pm.sender_id': otherUserId,
+                        'pm.receiver_id': myId
+                    });
+                })
+                .orderBy('pm.timestamp', 'asc');
 
-        res.json(messages);
-    } catch (error) {
-        console.error("Errore recupero messaggi privati:", error);
-        res.status(500).json({ message: "Errore interno del server." });
-    }
+            // 2️⃣ Segna messaggi come letti
+            await trx('private_messages')
+                .where({
+                    sender_id: otherUserId,
+                    receiver_id: myId,
+                    is_read: 0
+                })
+                .update({ is_read: 1 });
+
+            return msgs;
+        });
+
+        res.json(messages);
+
+    } catch (error) {
+        console.error("Errore recupero messaggi privati:", error);
+        res.status(500).json({ message: "Errore interno del server." });
+    }
 });
 
-// FINE MESSAGGI PRIVATI
+// =================================================================
+// --- FINE API MESSAGGISTICA PRIVATA ---
+// =================================================================
+
 
 
 // --- 5. AVVIO DELL'APPLICAZIONE ---
