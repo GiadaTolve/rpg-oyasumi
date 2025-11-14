@@ -1,0 +1,23 @@
+# Dipendenze
+node_modules/
+gdr-frontend/node_modules/
+gdr-oyasumi-node/node_modules/
+
+# File di build (per React)
+gdr-frontend/dist/
+gdr-frontend/build/
+
+# File segreti
+.env
+gdr-frontend/.env
+gdr-oyasumi-node/.env
+
+# Database locale (non caricarlo!)
+gdr.db
+gdr-oyasumi-node/gdr.db
+
+# Log di sistema
+.DS_Store
+
+# Altre cose
+GEMINI.md
