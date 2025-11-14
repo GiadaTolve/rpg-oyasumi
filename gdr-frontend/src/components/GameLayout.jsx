@@ -10,6 +10,7 @@ import Banca from './Banca';
 import Guida from './Guida';
 import Ambientazione from './Ambientazione';
 import Shinigami from './Shinigami';
+import MessagingManager from './MessagingManager'; // <-- AGGIUNTO
 import api from '../api';
 
 function GameLayout({ user, onLogout }) {
@@ -20,6 +21,9 @@ function GameLayout({ user, onLogout }) {
     const [mapId, setMapId] = useState('root');
     const [isSchedaOpen, setIsSchedaOpen] = useState(false);
     const [isBancaOpen, setIsBancaOpen] = useState(false);
+    
+    // --- NUOVO: Stato per la messaggistica ---
+    const [isMessagingOpen, setIsMessagingOpen] = useState(false);
 
     // 2. Aggiungi gli stati per le nuove finestre
     const [isGuidaOpen, setIsGuidaOpen] = useState(false);
@@ -29,6 +33,9 @@ function GameLayout({ user, onLogout }) {
     // Funzioni di toggle esistenti
     const handleToggleScheda = () => setIsSchedaOpen(!isSchedaOpen);
     const handleToggleBanca = () => setIsBancaOpen(!isBancaOpen);
+    
+    // --- NUOVO: Handler per la messaggistica ---
+    const handleToggleMessages = () => setIsMessagingOpen(!isMessagingOpen);
 
     // 3. Aggiungi le nuove funzioni di toggle
     const handleToggleGuida = () => setIsGuidaOpen(!isGuidaOpen);
@@ -83,7 +90,7 @@ function GameLayout({ user, onLogout }) {
             <LeftSidebar 
                 onToggleScheda={handleToggleScheda} 
                 onToggleBanca={handleToggleBanca}
-                // onToggleMessages andrà qui quando lo integreremo
+                onToggleMessages={handleToggleMessages} // <-- AGGIUNTO: Prop per la messaggistica
             />
 
             <main className="main-content">
@@ -100,6 +107,10 @@ function GameLayout({ user, onLogout }) {
             {isGuidaOpen && <Guida onClose={handleToggleGuida} />}
             {isAmbientazioneOpen && <Ambientazione onClose={handleToggleAmbientazione} />}
             {isShinigamiOpen && <Shinigami onClose={handleToggleShinigami} />}
+            
+            {/* --- NUOVO: MESSAGING MANAGER --- */}
+            {isMessagingOpen && <MessagingManager isVisible={isMessagingOpen} onClose={handleToggleMessages} />}
+
 
             <div className="chat-windows-area">
                 {openChats.map(chat => (
