@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../api'; // <-- AGGIUNTO: Usa il nostro file API "intelligente"
 
 function LoginForm({ onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  // Nota: ti consiglio di rimettere il 'loading' che avevi nel file originale
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
     try {
-      const response = await axios.post('http://localhost:3000/api/login', {
+      // --- QUESTA È LA CORREZIONE ---
+      // Ora usa 'api' (che sa l'URL di produzione) invece di 'axios'
+      // e non serve più l'URL completo, basta la route '/login'
+      const response = await api.post('/login', {
         email: email,
         password: password
       });
