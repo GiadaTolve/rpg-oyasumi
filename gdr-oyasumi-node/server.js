@@ -1963,9 +1963,9 @@ app.get('/api/pm/conversations', verificaToken, async (req, res) => {
                      FROM private_messages 
                      WHERE sender_id = u.id_utente 
                        AND receiver_id = ? 
-                       AND is_read = 0
+                       AND is_read = FALSE
                     ) AS unread_count
-                `, [myId])
+                `, [myId]) // <-- CORRETTO: is_read = FALSE
             ])
             .whereIn('u.id_utente', partnerIds)
             .orderBy(db.raw('last_message_timestamp'), 'desc');
@@ -2012,9 +2012,9 @@ app.get('/api/pm/conversation/:userId', verificaToken, async (req, res) => {
                 .where({
                     sender_id: otherUserId,
                     receiver_id: myId,
-                    is_read: 0
+                    is_read: false // <-- CORRETTO: is_read = FALSE (booleano)
                 })
-                .update({ is_read: 1 });
+                .update({ is_read: true }); // <-- CORRETTO: update a TRUE (booleano)
 
             return msgs;
         });
