@@ -1,197 +1,110 @@
 import React from 'react';
 import { useOutletContext } from 'react-router-dom';
-
-// --- STILI ---
-const styles = {
-    // Stili principali (invariati)
-    subMapContainer: {
-        width: '100%',
-        height: '100%',
-        padding: '0px',
-        boxSizing: 'border-box',
-    },
-    mapDisplay: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        position: 'relative',
-        height: '750px',
-        padding: '20px',
-        border: '1px solid #31323e',
-        borderRadius: '8px',
-        backgroundImage: 'url(/backgrounds/darkstone.png)',
-        backgroundRepeat: 'repeat',
-        backgroundSize: '250px',
-    },
-    locationColumn: { // Nome cambiato da chatColumn per generalizzare
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '10px',
-        zIndex: 2,
-    },
-
-    mapNameLabel: {
-        position: 'absolute',
-        bottom: '15px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-        color: '#e6e0ff',
-        padding: '5px 20px',
-        borderRadius: '20px',
-        border: '1px solid #4a4b57',
-        fontSize: '1.1em',
-        fontWeight: 'bold',
-        zIndex: 1,
-    },
-    goBackButton: {
-        position: 'absolute',
-        top: '15px',
-        left: '15px',
-        zIndex: 10,
-        padding: '4px 12px',
-        fontSize: '12px',
-        backgroundColor: 'rgba(30, 32, 44, 0.8)',
-        border: '1px solid #4a4b57',
-        color: '#bfc0d1',
-        borderRadius: '5px',
-        cursor: 'pointer',
-    },
-    
-    locationButton: {
-      width: '350px',
-      height: '70px',
-      border: '2px solid rgb(171, 143, 19)', // Bordo dorato
-      borderRadius: '3px',
-      cursor: 'pointer',
-      position: 'relative', // Necessario per posizionare l'immagine e il testo
-      overflow: 'hidden', // Nasconde le parti dell'immagine che escono dai bordi
-      padding: 0, // Rimuove il padding di default del bottone
-      backgroundColor: '#111', // Sfondo di fallback se l'immagine non carica
-  },
-  // --- STILE MODIFICATO PER L'IMMAGINE ---
-  locationImagePreview: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      width: '100%',
-      height: '100%', // Ora copre l'intera altezza del bottone
-      objectFit: 'cover', // Scala l'immagine per coprire l'area, ritagliando se necessario
-      zIndex: 1,
-      filter: 'brightness(0.6)', // Scurisce l'immagine per rendere il testo più leggibile
-  },
-  locationName: {
-      position: 'absolute',
-      top: '50%',
-      left: '50%',
-      transform: 'translate(-50%, -50%)',
-      zIndex: 2, // Sta sopra all'immagine
-      color: 'white',
-      fontWeight: 'bold',
-      fontSize: '11px',
-      textShadow: '1px 1px 3px black', // Ombra per migliorare la leggibilità
-      width: '100%',
-      textAlign: 'center',
-  },
-};
-// Per completezza, ri-aggiungo gli stili che ho omesso con "..."
-styles.mapNameLabel = {
-  position: 'absolute', bottom: '15px', left: '50%', transform: 'translateX(-50%)',
-  backgroundColor: 'rgba(0, 0, 0, 0.7)', color: '#e6e0ff', padding: '5px 20px',
-  borderRadius: '20px', border: '1px solid #4a4b57', fontSize: '1.1em', fontWeight: 'bold', zIndex: 1,
-};
-styles.goBackButton = {
-  position: 'absolute', top: '15px', left: '15px', zIndex: 10, padding: '4px 12px',
-  fontSize: '12px', backgroundColor: 'rgba(30, 32, 44, 0.8)', border: '1px solid #4a4b57',
-  color: '#bfc0d1', borderRadius: '5px', cursor: 'pointer',
-};
-
-
-// --- NUOVO SOTTO-COMPONENTE PER I BOTTONI ---
-const LocationButton = ({ location, onClick }) => {
-  // Usa un'immagine segnaposto se non c'è un'immagine specifica
-  const imageUrl = location.image_url || '/backgrounds/darkstone.png';
-
-  return (
-      <button 
-          style={styles.locationButton} 
-          onClick={() => onClick(location)}
-          title={location.name}
-      >
-          <img src={imageUrl} alt="" style={styles.locationImagePreview} />
-          <span style={styles.locationName}>{location.name}</span>
-      </button>
-  );
-};
-
+import './Map.css';
 
 function MapContent() {
   const { map, children, onZoneClick, onGoBack } = useOutletContext();
 
-  if (!map) {
-      return <div>Caricamento mappa...</div>;
-  }
+  if (!map) return <div className="map-loading">Caricamento...</div>;
 
-  const isRootMap = map.parent_id === null;
+  const isRootMap = !map.parent_id || map.id === 'root';
 
-  // CASO 1: MAPPA RADICE (MOSAICO - INVARIATO)
+  // =====================================================
+  // ROOT MAP (Invariata)
+  // =====================================================
   if (isRootMap) {
       return (
-          <div className="map-container">
-              <img src={map.image_url} alt={map.name} className="map-image" />
+          <div className="root-map-container" style={{ backgroundImage: `url(${map.image_url || '/maps/map.png'})` }}>
               {children.map(child => (
-                  <img
+                  <div 
                       key={child.id}
-                      src={child.image_url}
-                      alt={child.name}
-                      className="map-tile"
-                      style={{
-                          left: `${child.pos_x}%`,
-                          top: `${child.pos_y}%`,
-                          width: child.description || 'auto',
-                      }}
+                      className="map-pin-wrapper"
+                      style={{ left: `${child.pos_x}%`, top: `${child.pos_y}%` }}
                       onClick={() => onZoneClick(child)}
-                      title={`Vai a ${child.name}`}
-                  />
+                  >
+                      <img src="/icone/map-pin.png" alt="📍" className="pin-icon" />
+                      <div className="glass-label">{child.name}</div>
+                  </div>
               ))}
           </div>
       );
   }
 
-  // --- CASO 2: SOTTOMAPPA (LAYOUT AGGIORNATO) ---
-  // Ora non filtriamo più, li trattiamo tutti allo stesso modo
-  const leftLocations = children.filter((_, index) => index % 2 === 0);
-  const rightLocations = children.filter((_, index) => index % 2 !== 0);
-
+  // =====================================================
+  // SUB MAP (Interni) - Layout Aggiornato
+  // =====================================================
   return (
-      <div style={styles.subMapContainer}>
-          <div style={styles.mapDisplay}>
-              
-              {map.parent_id && (
-                  <button onClick={onGoBack} style={styles.goBackButton}>
-                      &larr; Torna Indietro
-                  </button>
-              )}
+      <div className="sub-map-wrapper">
+          
+          {/* CORNICE ESTERNA */}
+          <div className="outer-border-frame"></div>
 
-              {/* Colonna Sinistra */}
-              <div style={styles.locationColumn}>
-                  {leftLocations.map(location => (
-                      <LocationButton key={location.id} location={location} onClick={onZoneClick} />
-                  ))}
-              </div>
-              
-              {/* Colonna Destra */}
-              <div style={styles.locationColumn}>
-                  {rightLocations.map(location => (
-                      <LocationButton key={location.id} location={location} onClick={onZoneClick} />
-                  ))}
-              </div>
+          {/* CONTENUTO */}
+          <div className="sub-map-content">
+            
+              {/* Pulsante Indietro */}
+              <button onClick={onGoBack} className="floating-back-btn">
+                  &larr; INDIETRO
+              </button>
 
-              <h2 style={styles.mapNameLabel}>{map.name}</h2>
+              <div className="map-grid">
+                  
+                  {/* --- SINISTRA: Immagine + Frame + Profondità --- */}
+                  <div className="col-image">
+                      <div className="depth-wrapper"> {/* Wrapper per l'effetto profondità */}
+                          <div className="image-frame-container">
+                              <img 
+                                  src={map.image_url || '/maps/kessen.map.png'} 
+                                  alt={map.name} 
+                                  className="location-image" 
+                              />
+                              <div className="location-frame-overlay"></div>
+                          </div>
+                      </div>
+                  </div>
+
+                  {/* --- CENTRO: Divisori e Testo --- */}
+                  <div className="col-info">
+                      {/* Titolo (Opzionale, sta meglio se c'è) */}
+                      <h2 className="info-title">{map.name}</h2>
+
+                      {/* Divisore SOPRA */}
+                      <img src="/frames/interrompilinea.png" className="divider-img" alt="divider top" />
+                      
+                      {/* Testo Descrizione */}
+                      <div className="info-desc-box">
+                          {map.description || "Nessuna descrizione disponibile per questo luogo onirico."}
+                      </div>
+
+                      {/* Divisore SOTTO (Ribaltato) */}
+                      <img src="/frames/interrompilinea.png" className="divider-img flipped" alt="divider bottom" />
+                  </div>
+
+                  {/* --- DESTRA: Elenco Chat --- */}
+                  <div className="col-nav">
+                      <div className="nav-list">
+                        {children.length > 0 ? (
+                            children.map(child => (
+                                <div 
+                                    key={child.id} 
+                                    className="nav-button" 
+                                    onClick={() => onZoneClick(child)}
+                                >
+                                    <span className="nav-text">
+                                        {child.type === 'CHAT' ? '' : '✦'} {child.name}
+                                    </span>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="empty-text">Nessuna zona qui.</div>
+                        )}
+                      </div>
+                  </div>
+
+              </div>
           </div>
       </div>
   );
 }
 
 export default MapContent;
-

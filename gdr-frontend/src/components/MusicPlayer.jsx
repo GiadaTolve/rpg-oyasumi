@@ -1,92 +1,121 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
 
-// --- STILI COMPLETAMENTE RINNOVATI ---
+// --- STILI AGGIORNATI (Fix Background) ---
 const styles = {
     playerContainer: {
-        marginTop: '20px',
-        padding: '15px',
-        backgroundColor: '#2a292f',
-        border: '1px solid #31323e',
-        fontFamily: "'Work Sans', sans-serif",
-        borderRadius: '5px',
-        boxShadow: '0 0 15px rgba(96, 81, 155, 0.4)',
+        marginTop: '15px',
+        padding: '10px', 
+        
+        // --- FIX BACKGROUND ---
+        // Sovrapponiamo un velo nero al 60% sopra l'immagine per scurirla senza nasconderla
+        backgroundImage: "linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.8)), url('/backgrounds/cloudy.png')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        
+        border: '1px solid rgba(162, 112, 255, 0.2)',
+        borderRadius: '8px',
+        fontFamily: "'Inter', sans-serif",
+        boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
+        
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
     },
-    coverArtContainer: {
+    
+    // Cover Art (Ridotta altezza)
+    coverWrapper: {
         position: 'relative',
         width: '100%',
-        height: '80px', 
-        marginBottom: '5px',
-        borderRadius: '2px',
+        height: '90px', 
+        borderRadius: '4px',
         overflow: 'hidden',
+        border: '1px solid rgba(255,255,255,0.1)',
     },
     coverArt: {
         width: '100%',
         height: '100%',
         objectFit: 'cover',
+        filter: 'brightness(0.9)', // Leggermente più luminosa
     },
-    neonFrame: {
+    coverFrame: {
         position: 'absolute',
-        top: 0, left: 0,
-        width: '100%',
-        height: '100%',
-        borderRadius: '3px',
-        boxShadow: '0 0 8px rgba(180, 150, 220, 0.6) inset, 0 0 8px rgba(180, 150, 220, 0.6)',
+        top: 0, left: 0, width: '100%', height: '100%',
+        background: 'linear-gradient(to bottom, rgba(0,0,0,0) 50%, rgba(0,0,0,0.9) 100%)',
         pointerEvents: 'none',
     },
+
+    // Titolo Canzone
     titleContainer: {
-        backgroundColor: 'black',
-        padding: '2px 0',
-        marginBottom: '10px',
-        borderRadius: '2px',
-        overflow: 'hidden',
-        whiteSpace: 'nowrap',
+        position: 'absolute',
+        bottom: '4px',
+        left: '0',
+        width: '100%',
+        textAlign: 'center',
+        padding: '0 5px',
+        boxSizing: 'border-box',
     },
-    titleMarquee: {
-        fontFamily: "arcade", // Assicurati che 'ArcadeClassic' sia il nome del tuo font
+    songTitle: {
+        fontFamily: "'Cinzel', serif",
+        fontSize: '11px', 
         color: '#e6e0ff',
-        fontSize: '16px',
+        fontWeight: 'bold',
         textTransform: 'uppercase',
-        display: 'inline-block',
-        paddingLeft: '100%',
-        animation: 'marquee 15s linear infinite',
+        letterSpacing: '1px',
+        textShadow: '0 2px 4px rgba(0,0,0,1)',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
     },
-    controls: {
+
+    // Controlli Player
+    controlsBox: {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        gap: '10px', // Spazio tra i gruppi di bottoni
+        gap: '12px',
+        paddingTop: '2px',
     },
-    controlButton: {
+    controlBtn: {
         background: 'none',
         border: 'none',
         cursor: 'pointer',
-        padding: '0',
-        width: '24px',
-        height: '24px',
+        padding: '4px',
         transition: 'all 0.2s ease',
-        outline: 'none', // Rimuove il bordo rosa/blu al focus
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
-    playPauseButton: {
-        width: '32px',
-        height: '32px',
+    
+    ctrlIcon: {
+        width: '18px', 
+        height: '18px',
+        // Filtro per rendere le icone grigio/viola chiaro
+        filter: 'invert(80%) sepia(10%) saturate(200%) hue-rotate(220deg) brightness(95%) contrast(90%)', 
+        transition: 'filter 0.2s ease, transform 0.2s ease',
     },
-    // Stile dell'icona (separato dal bottone)
-    icon: {
+    
+    playIcon: {
+        width: '28px', 
+        height: '28px',
+        // Filtro Oro per il play
+        filter: 'invert(76%) sepia(34%) saturate(646%) hue-rotate(356deg) brightness(98%) contrast(88%) drop-shadow(0 0 5px rgba(201, 168, 74, 0.5))',
+    },
+
+    // Playlist Dropdown
+    playlistSelect: {
         width: '100%',
-        height: '100%',
-        transition: 'filter 0.2s ease', // Transizione per il filtro
+        padding: '4px 8px',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        color: '#c9a84a', 
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        borderRadius: '4px',
+        fontSize: '10px',
+        fontFamily: "'Cinzel', serif",
+        cursor: 'pointer',
+        outline: 'none',
+        marginTop: '2px',
     },
-    // Stili per gli effetti (da applicare all'icona)
-    iconHover: {
-        filter: 'drop-shadow(0 0 4px rgba(0, 0, 0, 0.8))', // Ombra nera
-    },
-    iconActive: {
-        filter: 'drop-shadow(0 0 6px #c8a2c8) drop-shadow(0 0 12px #c8a2c8)', // Glow lilla
-    },
-
-    playlistSelect: { width: '100%', padding: '8px', backgroundColor: '#1e2124', color: '#a4a5b9', border: '1px solid #60519b', borderRadius: '3px', marginTop: '15px', fontSize: '13px' }
-
 };
 
 
@@ -96,82 +125,107 @@ const MusicPlayer = () => {
     const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isMuted, setIsMuted] = useState(() => localStorage.getItem('oyasumi-player-muted') !== 'false');
-    const [hoveredButton, setHoveredButton] = useState(null);
-    const [activeButton, setActiveButton] = useState(null);
     const audioRef = useRef(null);
 
-    useEffect(() => { api.get('/playlists').then(res => { setPlaylists(res.data); if (res.data.length > 0) { api.get(`/playlists/${res.data[0].id}/songs`).then(songRes => { setCurrentPlaylist(songRes.data); }); } }); }, []);
-    useEffect(() => { if (audioRef.current) audioRef.current.muted = isMuted; localStorage.setItem('oyasumi-player-muted', isMuted); }, [isMuted]);
-    useEffect(() => { if (currentPlaylist.length > 0 && audioRef.current) { audioRef.current.load(); if (isPlaying) { audioRef.current.play().catch(e => console.warn("Autoplay bloccato:", e.message)); } } }, [currentTrackIndex, currentPlaylist]);
-    const playNextSong = () => { if (currentPlaylist.length === 0) return; setCurrentTrackIndex(prevIndex => (prevIndex + 1) % currentPlaylist.length); };
-    const playPrevSong = () => { if (currentPlaylist.length === 0) return; setCurrentTrackIndex(prevIndex => (prevIndex - 1 + currentPlaylist.length) % currentPlaylist.length); };
-    const handleEnded = () => { playNextSong(); };
-    const togglePlay = () => { if (!audioRef.current || !audioRef.current.src || audioRef.current.src === window.location.href) { console.warn("Nessuna traccia audio valida da riprodurre."); return; } const newIsPlaying = !isPlaying; if (newIsPlaying) { audioRef.current.play().catch(e => console.error("Errore di riproduzione:", e.message)); } else { audioRef.current.pause(); } setIsPlaying(newIsPlaying); };
-    const toggleMute = () => setIsMuted(!isMuted);
-    const handlePlaylistChange = (e) => { const playlistId = e.target.value; setIsPlaying(false); setCurrentTrackIndex(0); api.get(`/playlists/${playlistId}/songs`).then(songRes => { setCurrentPlaylist(songRes.data); }); };
+    useEffect(() => { 
+        api.get('/playlists').then(res => { 
+            setPlaylists(res.data); 
+            if (res.data.length > 0) { 
+                api.get(`/playlists/${res.data[0].id}/songs`).then(songRes => setCurrentPlaylist(songRes.data)); 
+            } 
+        }); 
+    }, []);
+
+    useEffect(() => { 
+        if (audioRef.current) audioRef.current.muted = isMuted; 
+        localStorage.setItem('oyasumi-player-muted', isMuted); 
+    }, [isMuted]);
+
+    useEffect(() => { 
+        if (currentPlaylist.length > 0 && audioRef.current) { 
+            audioRef.current.load(); 
+            if (isPlaying) audioRef.current.play().catch(e => console.warn("Autoplay:", e.message)); 
+        } 
+    }, [currentTrackIndex, currentPlaylist]);
+
+    const playNext = () => { if (currentPlaylist.length) setCurrentTrackIndex(prev => (prev + 1) % currentPlaylist.length); };
+    const playPrev = () => { if (currentPlaylist.length) setCurrentTrackIndex(prev => (prev - 1 + currentPlaylist.length) % currentPlaylist.length); };
+    const togglePlay = () => { 
+        const newIsPlaying = !isPlaying;
+        if (newIsPlaying) audioRef.current.play().catch(e => console.error("Play error:", e));
+        else audioRef.current.pause();
+        setIsPlaying(newIsPlaying);
+    };
+    const handlePlaylistChange = (e) => { 
+        const pid = e.target.value; 
+        setIsPlaying(false); 
+        setCurrentTrackIndex(0); 
+        api.get(`/playlists/${pid}/songs`).then(res => setCurrentPlaylist(res.data)); 
+    };
+
     const currentTrack = currentPlaylist[currentTrackIndex];
-    const getAudioSource = () => { if (!currentTrack) return null; if (currentTrack.source_type === 'youtube') { const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/ ]{11})/; const match = currentTrack.url.match(regex); const videoId = match ? match[1] : null; if (videoId) return `/api/youtube-stream/${videoId}`; return null; } return currentTrack.url; };
-    const getIconStyle = (buttonName) => {
-        let style = styles.icon;
-        if (activeButton === buttonName) {
-            return { ...style, ...styles.iconActive };
+    const getSrc = () => {
+        if (!currentTrack) return null;
+        if (currentTrack.source_type === 'youtube') {
+            const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/ ]{11})/;
+            const match = currentTrack.url.match(regex);
+            return match ? `/api/youtube-stream/${match[1]}` : null;
         }
-        if (hoveredButton === buttonName) {
-            return { ...style, ...styles.iconHover };
-        }
-        return style;
+        return currentTrack.url;
     };
 
     return (
         <div style={styles.playerContainer}>
-            <audio ref={audioRef} src={getAudioSource()} onEnded={handleEnded} controls={false} />
+            <audio ref={audioRef} src={getSrc()} onEnded={playNext} controls={false} />
             
-            <div style={styles.coverArtContainer}><img src={currentTrack?.cover_image_url || '/placeholder.jpg'} alt="cover" style={styles.coverArt} /><div style={styles.neonFrame}></div></div>
-            <div style={styles.titleContainer}><div style={styles.titleMarquee}>{currentTrack?.title || 'NESSUNA TRACCIA'}</div></div>
+            {/* COVER ART + TITOLO */}
+            <div style={styles.coverWrapper}>
+                <img 
+                    src={currentTrack?.cover_image_url || '/placeholder.jpg'} 
+                    alt="cover" 
+                    style={styles.coverArt} 
+                />
+                <div style={styles.coverFrame}>
+                    <div style={styles.titleContainer}>
+                        <div style={styles.songTitle}>
+                            {currentTrack?.title || 'SILENZIO'}
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-            <div style={styles.controls}>
-                <button 
-                    style={styles.controlButton} 
-                    onClick={playPrevSong} 
-                    onMouseEnter={() => setHoveredButton('prev')} 
-                    onMouseLeave={() => setHoveredButton(null)}
-                    onMouseDown={() => setActiveButton('prev')}
-                    onMouseUp={() => setActiveButton(null)}
-                >
-                    <img src="/musica/previous.png" alt="Previous" style={getIconStyle('prev')} />
+            {/* CONTROLLI */}
+            <div style={styles.controlsBox}>
+                <button style={styles.controlBtn} onClick={playPrev} title="Precedente">
+                    <img src="/musica/previous.png" alt="Prev" style={styles.ctrlIcon} 
+                         onMouseEnter={e => e.target.style.filter = "brightness(1.5) drop-shadow(0 0 5px white)"}
+                         onMouseLeave={e => e.target.style.filter = styles.ctrlIcon.filter}
+                    />
                 </button>
 
-                <button 
-                    style={{...styles.controlButton, ...styles.playPauseButton}} 
-                    onClick={togglePlay}
-                    onMouseEnter={() => setHoveredButton('play')} 
-                    onMouseLeave={() => setHoveredButton(null)}
-                    onMouseDown={() => setActiveButton('play')}
-                    onMouseUp={() => setActiveButton(null)}
-                >
-                    <img src={isPlaying ? "/musica/pause.png" : "/musica/play.png"} alt="Play/Pausa" style={getIconStyle('play')} />
+                <button style={styles.controlBtn} onClick={togglePlay} title={isPlaying ? "Pausa" : "Riproduci"}>
+                    <img 
+                        src={isPlaying ? "/musica/pause.png" : "/musica/play.png"} 
+                        alt="Play" 
+                        style={styles.playIcon} 
+                        onMouseEnter={e => e.target.style.transform = "scale(1.1)"}
+                        onMouseLeave={e => e.target.style.transform = "scale(1)"}
+                    />
                 </button>
 
-                <button 
-                    style={styles.controlButton} 
-                    onClick={playNextSong}
-                    onMouseEnter={() => setHoveredButton('next')} 
-                    onMouseLeave={() => setHoveredButton(null)}
-                    onMouseDown={() => setActiveButton('next')}
-                    onMouseUp={() => setActiveButton(null)}
-                >
-                    <img src="/musica/next.png" alt="Next" style={getIconStyle('next')} />
+                <button style={styles.controlBtn} onClick={playNext} title="Successiva">
+                    <img src="/musica/next.png" alt="Next" style={styles.ctrlIcon}
+                         onMouseEnter={e => e.target.style.filter = "brightness(1.5) drop-shadow(0 0 5px white)"}
+                         onMouseLeave={e => e.target.style.filter = styles.ctrlIcon.filter}
+                    />
                 </button>
                 
-                <button 
-                    style={styles.controlButton} 
-                    onClick={toggleMute}
-                    onMouseEnter={() => setHoveredButton('mute')} 
-                    onMouseLeave={() => setHoveredButton(null)}
-                    onMouseDown={() => setActiveButton('mute')}
-                    onMouseUp={() => setActiveButton(null)}
-                >
-                    <img src={isMuted ? "/musica/mute.png" : "/musica/volumeup.png"} alt="Muto" style={getIconStyle('mute')} />
+                <button style={{...styles.controlBtn, marginLeft:'10px'}} onClick={() => setIsMuted(!isMuted)} title="Muto/Unmute">
+                    <img src={isMuted ? "/musica/mute.png" : "/musica/volumeup.png"} alt="Vol" 
+                         style={{...styles.ctrlIcon, width:'14px', height:'14px', opacity: 0.7}}
+                         onMouseEnter={e => e.target.style.opacity = 1}
+                         onMouseLeave={e => e.target.style.opacity = 0.7}
+                    />
                 </button>
             </div>
 

@@ -1,61 +1,40 @@
 import React, { useRef } from 'react';
-import api from '../api';
 
 const styles = {
-    form: { marginTop: '20px', padding: '20px', backgroundColor: 'rgba(23, 23, 23, 0.9)', border: '1px solid #31323e', borderRadius: '5px' },
-    bbcodePanel: { background: '#3c3c3c', border: '1px solid #555', borderBottom: 'none', padding: '5px', display: 'flex', gap: '5px' },
-    bbcodeButton: { background: '#555', border: '1px solid #666', color: 'white', cursor: 'pointer', padding: '5px 10px' },
+    form: { marginTop: '10px', padding: '0' },
+    bbcodePanel: { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '5px', display: 'flex', gap: '5px', borderBottom: 'none' },
+    bbcodeButton: { background: 'transparent', border: '1px solid #666', color: '#bbb', cursor: 'pointer', padding: '2px 8px', fontSize:'11px' },
     textarea: { 
-        width: '100%', 
-        boxSizing: 'border-box', 
-        padding: '5px', 
-        background: '#3c3c3c', 
-        border: '1px solid #555', 
-        color: 'white', 
-        borderRadius: '0 0 4px 4px', 
-        // --- MODIFICA APPLICATA QUI ---
-        minHeight: '00px', // Ridotto da 150px a 100px
-        fontFamily: 'inherit', 
-        fontSize: '1rem' 
+        width: '100%', boxSizing: 'border-box', padding: '10px', 
+        background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', 
+        color: '#e6e0ff', fontFamily: "'Inter', sans-serif", fontSize: '13px', minHeight: '100px' 
     },
-    button: { marginTop: '10px', padding: '10px 20px', border: 'none', borderRadius: '4px', cursor: 'pointer', backgroundColor: '#60519b', color: 'white', fontWeight: 'bold' },
+    button: { 
+        marginTop: '10px', padding: '10px 20px', border: '1px solid #a270ff', borderRadius: '4px', cursor: 'pointer', 
+        backgroundColor: 'rgba(162, 112, 255, 0.2)', color: '#e6e0ff', fontWeight: 'bold', fontFamily: "'Cinzel', serif" 
+    },
 };
 
-function NewPostForm({ topicId, text, setText, isSubmitting, setIsSubmitting, error, setError, onSubmit, formRef }) {
+function NewPostForm({ text, setText, isSubmitting, error, onSubmit }) {
     const textareaRef = useRef(null);
-
     const applyBBCode = (tag) => {
         const textarea = textareaRef.current;
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const selectedText = text.substring(start, end);
-        const newText = `${text.substring(0, start)}[${tag}]${selectedText}[/${tag}]${text.substring(end)}`;
-        setText(newText);
-        textarea.focus();
+        const start = textarea.selectionStart; const end = textarea.selectionEnd;
+        const newText = `${text.substring(0, start)}[${tag}]${text.substring(start, end)}[/${tag}]${text.substring(end)}`;
+        setText(newText); textarea.focus();
     };
 
     return (
-        <form onSubmit={onSubmit} style={styles.form} ref={formRef}>
-          
-            {error && <p style={{ color: 'red' }}>{error}</p>}
+        <form onSubmit={onSubmit} style={styles.form}>
+            {error && <p style={{ color: '#ff6b6b' }}>{error}</p>}
             <div style={styles.bbcodePanel}>
                 <button type="button" style={styles.bbcodeButton} onClick={() => applyBBCode('b')}><b>B</b></button>
                 <button type="button" style={styles.bbcodeButton} onClick={() => applyBBCode('i')}><i>I</i></button>
-                <button type="button" style={styles.bbcodeButton} onClick={() => applyBBCode('u')}><u>U</u></button>
+                <button type="button" style={styles.bbcodeButton} onClick={() => applyBBCode('quote')}>QUOTE</button>
             </div>
-            <textarea
-                ref={textareaRef}
-                style={styles.textarea}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Scrivi qui..."
-                required
-            />
-            <button type="submit" style={styles.button} disabled={isSubmitting}>
-                {isSubmitting ? 'Invio...' : 'Invia Risposta'}
-            </button>
+            <textarea ref={textareaRef} style={styles.textarea} value={text} onChange={(e) => setText(e.target.value)} placeholder="Scrivi la tua risposta..." required />
+            <button type="submit" style={styles.button} disabled={isSubmitting}>{isSubmitting ? 'INVIO...' : 'INVIA RISPOSTA'}</button>
         </form>
     );
 }
-
 export default NewPostForm;

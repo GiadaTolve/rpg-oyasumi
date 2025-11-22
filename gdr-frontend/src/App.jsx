@@ -76,8 +76,7 @@ function App() {
 
               {/* --- FORUM --- */}
               <Route path="forum" element={<Forum />} />
-              <Route path="forum/bacheca/:bachecaId" element={<BachecaPage user={user} />} />
-              <Route path="forum/topic/:topicId" element={<TopicPage user={user} />} />
+              <Route path="forum/bacheca/:bachecaId" element={<BachecaPage user={user} />} />              <Route path="forum/topic/:topicId" element={<TopicPage user={user} />} />
               
               <Route path="*" element={<Navigate to="/" replace />} />
 

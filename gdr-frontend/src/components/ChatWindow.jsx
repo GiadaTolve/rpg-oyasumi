@@ -4,79 +4,139 @@ import api from '../api.js';
 import ChatMessage from './ChatMessage.jsx';
 import ShinigamiPanel from './ShinigamiPanel.jsx';
 
-// --- STILI ---
+// --- STILI DARK ARCANE ---
 const styles = {
-  window: { position: 'absolute', width: '1600px', height: '810px', backgroundColor: '#121212', border: '1px solid #31323e', borderRadius: '8px', display: 'flex', flexDirection: 'column', zIndex: 100, boxShadow: '0 8px 30px rgba(0, 0, 0, 0.6)', color: '#bfc0d1', resize: 'both', overflow: 'hidden' },
-  header: { padding: '10px 15px', backgroundColor: '#1e202c', cursor: 'move', borderBottom: '1px solid #31323e', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, fontWeight: 'bold' },
+  window: { 
+    // --- POSIZIONAMENTO GRID (Fondamentale) ---
+    gridArea: 'main-content',
+    width: '100%', 
+    height: '100%',
+    margin: 0,
+    // ----------------------------------------
+    backgroundColor: 'rgba(11, 11, 17, 0.98)', 
+    border: '1px solid rgba(162, 112, 255, 0.2)', 
+    borderRadius: '5px', 
+    display: 'flex', 
+    flexDirection: 'column', 
+    zIndex: 100, // Livello base (sopra la mappa, sotto le modali)
+    boxShadow: '0 0 50px rgba(0, 0, 0, 0.8)', 
+    color: '#b3b3c0', 
+    fontFamily: "'Inter', sans-serif",
+    overflow: 'hidden' 
+  },
+
+  // HEADER
+  header: { 
+    padding: '0 20px', height: '50px',    
+    backgroundImage: "linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.8)), url('/backgrounds/cloudy.png')",
+    backgroundSize: 'cover', backgroundPosition: 'center',
+    borderBottom: '1px solid rgba(162, 112, 255, 0.3)', 
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, 
+  },
+  headerTitle: {
+    fontFamily: "'Cinzel', serif", fontWeight: '700', color: '#c9a84a', 
+    letterSpacing: '2px', textShadow: '0 2px 4px rgba(0,0,0,0.8)', fontSize: '16px',
+    textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '10px'
+  },
+  closeBtn: {
+    background: 'none', border: 'none', color: '#b3b3c0', fontFamily: "'Cinzel', serif",
+    fontSize: '20px', cursor: 'pointer', transition: 'color 0.2s', padding: '0 5px',
+  },
+
+  // LAYOUT INTERNO
   mainContent: { display: 'flex', flexGrow: 1, height: '100%', overflow: 'hidden' },
-  leftColumn: { width: '220px', flexShrink: 0, padding: '15px', borderRight: '1px solid #31323e', display: 'flex', flexDirection: 'column', backgroundColor: 'rgba(30, 32, 44, 0.4)', overflowY: 'auto' },
-  rightColumn: { flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: '#121212' },
-  messages: { flexGrow: 1, padding: '20px', overflowY: 'auto' },
-  inputArea: { padding: '15px', borderTop: '1px solid #31323e', backgroundColor: '#1e202c', flexShrink: 0, position: 'relative' },
-  form: { display: 'flex', gap: '10px', alignItems: 'center' },
+  
+  // COLONNA SX (Info)
+  leftColumn: { 
+    width: '260px', flexShrink: 0, padding: '20px', 
+    borderRight: '1px solid rgba(255,255,255,0.05)', 
+    display: 'flex', flexDirection: 'column', 
+    backgroundColor: 'rgba(0, 0, 0, 0.3)', 
+    overflowY: 'auto' 
+  },
+  
+  // COLONNA DX (Messaggi)
+  rightColumn: { 
+    flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', 
+    backgroundColor: 'transparent' 
+  },
+  messages: { 
+    flexGrow: 1, padding: '20px 40px', overflowY: 'auto', 
+    backgroundImage: "url('/backgrounds/darkstone.png')", backgroundRepeat: 'repeat', backgroundBlendMode: 'overlay', backgroundColor: 'rgba(0,0,0,0.6)',
+    scrollbarWidth: 'thin', scrollbarColor: '#c9a84a transparent'
+  },
+
+  // INPUT AREA
+  inputArea: { 
+    padding: '15px 20px', 
+    borderTop: '1px solid rgba(162, 112, 255, 0.2)', 
+    backgroundColor: 'rgba(15, 15, 20, 0.95)', 
+    flexShrink: 0, position: 'relative' 
+  },
+  form: { display: 'flex', gap: '10px', alignItems: 'flex-start' },
   luogoInput: {
-    background: '#31323e', border: '1px solid #4a4b57', color: '#bfc0d1', padding: '10px',
-    borderRadius: '5px', fontFamily: 'inherit', fontSize: '14px', width: '200px',
-    height: '42px',
-    boxSizing: 'border-box',
+    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#c9a84a',
+    padding: '10px', borderRadius: '4px', fontFamily: "'Cinzel', serif", fontSize: '12px', width: '150px',
+    height: '40px', boxSizing: 'border-box', textAlign: 'center'
   },
   messageInput: {
-    flexGrow: 1, background: '#31323e', border: '1px solid #4a4b57', color: '#bfc0d1', padding: '10px',
-    borderRadius: '5px', resize: 'vertical',
-    fontFamily: 'inherit', fontSize: '14px',
-    boxSizing: 'border-box',
-    height: '42px', 
+    flexGrow: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#e6e0ff',
+    padding: '10px', borderRadius: '4px', resize: 'none', fontFamily: "'Inter', sans-serif", fontSize: '14px', 
+    boxSizing: 'border-box', height: '40px', lineHeight: '1.4'
   },
   button: {
-    padding: '10px 20px', border: 'none', borderRadius: '5px', cursor: 'pointer',
-    background: `linear-gradient(45deg, #60519b, #7e6bbd)`, color: 'white', fontWeight: 'bold',
-    height: '42px',
-    boxSizing: 'border-box',
+    padding: '0 25px', border: 'none', borderRadius: '4px', cursor: 'pointer',
+    background: 'linear-gradient(90deg, #60519b, #a270ff)', color: 'white',
+    fontFamily: "'Cinzel', serif", fontWeight: 'bold', fontSize: '12px', height: '40px', 
+    boxSizing: 'border-box', transition: 'all 0.2s', textTransform: 'uppercase', letterSpacing: '1px',
+    boxShadow: '0 0 10px rgba(162, 112, 255, 0.3)'
   },
-  bottomBar: { display: 'flex', justifyContent: 'flex-start', gap: '10px', alignItems: 'center', marginTop: '15px' },
-  charCounter: { position: 'absolute', bottom: '5px', right: '20px', fontSize: '10px', color: '#a4a5b9' },
-  diceDropdownContainer: { position: 'relative' },
-  diceDropdownMenu: { position: 'absolute', bottom: '110%', left: 0, backgroundColor: '#31323e', border: '1px solid #4a4b57', borderRadius: '5px', padding: '5px', display: 'flex', flexDirection: 'column', gap: '5px', zIndex: 110 },
+
+  // BARRA STRUMENTI (Sotto l'input)
+  bottomBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', paddingLeft: '160px' }, // paddingLeft allinea con input
+  toolsLeft: { display: 'flex', gap: '8px' },
+  
   iconButton: {
-    backgroundColor: '#60519b',
-    border: '1px solid #320d41',
-    width: '42px',
-    height: '42px',
-    padding: '4px',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: '5px',
-    transition: 'all 0.2s ease',
+    backgroundColor: 'transparent', border: '1px solid rgba(255,255,255,0.1)', width: '30px', height: '30px',
+    padding: '0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', transition: 'all 0.2s ease',
   },
-  iconButtonHover: {
-    boxShadow: 'inset 0 0 8px rgba(0,0,0,0.6)',
-    filter: 'brightness(1.1)',
+  icon: { width: '18px', height: '18px', filter: 'invert(0.7)' },
+
+  // ELEMENTI SIDEBAR
+  chatImage: { 
+    width: '100%', height: '140px', objectFit: 'cover', borderRadius: '4px', marginBottom: '15px',
+    border: '1px solid rgba(162, 112, 255, 0.3)', filter: 'sepia(0.2) brightness(0.9)',
   },
-  icon: {
-    width: '28px',
-    height: '28px',
-    verticalAlign: 'middle',
+  descriptionBox: { fontSize: '12px', color: '#b3b3c0', flexGrow: 1, lineHeight: '1.6', fontStyle: 'italic', marginBottom: '15px' },
+  
+  toolButton: {
+      width: '100%', padding: '10px', marginBottom: '15px',
+      background: 'linear-gradient(90deg, rgba(201, 168, 74, 0.1), rgba(201, 168, 74, 0.05))',
+      border: '1px solid #c9a84a', borderRadius: '4px', color: '#c9a84a',
+      fontFamily: "'Cinzel', serif", fontWeight: 'bold', fontSize: '11px', cursor: 'pointer',
+      textTransform: 'uppercase', letterSpacing: '1px', transition: 'all 0.3s ease',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+  },
+  
+  presentiBox: { 
+    backgroundColor: 'rgba(0,0,0,0.3)', padding: '15px', borderRadius: '4px', marginTop: 'auto',
+    border: '1px solid rgba(255,255,255,0.05)', 
+  },
+  presentiTitle: { color: '#c9a84a', fontSize: '11px', fontFamily: "'Cinzel', serif", borderBottom:'1px solid rgba(255,255,255,0.1)', paddingBottom:'5px', marginBottom:'5px', fontWeight:'bold' },
+  presentiList: { listStyle: 'none', padding: 0, margin: 0, fontFamily: "'Inter', sans-serif", color: '#b3b3c0', fontSize: '12px' },
+  
+  charCounter: { fontSize: '10px', color: '#555', fontFamily: 'monospace' },
+
+  // MENU DADI
+  diceDropdownContainer: { position: 'relative' },
+  diceDropdownMenu: { 
+    position: 'absolute', bottom: '110%', left: 0, backgroundColor: '#1a1a1a', border: '1px solid #c9a84a',
+    borderRadius: '4px', padding: '5px', display: 'flex', flexDirection: 'column', gap: '2px', zIndex: 110, boxShadow: '0 0 10px rgba(0,0,0,0.8)'
   },
   diceButton: {
-    width: '100%', padding: '8px', cursor: 'pointer', backgroundColor: '#2a292f',
-    border: '1px solid #4a4b57', color: '#bfc0d1', borderRadius: '3px',
+    width: '100px', padding: '8px', cursor: 'pointer', backgroundColor: 'transparent', border: 'none',
+    color: '#c9a84a', fontFamily: "'Cinzel', serif", fontSize: '12px', textAlign: 'left',
   },
-  chatImage: { 
-    width: '100%', 
-    height: '120px', 
-    objectFit: 'cover', 
-    borderRadius: '4px', 
-    backgroundColor: '#121212', 
-    marginBottom: '15px',
-    border: '2px solid #60519b', // Bordo viola aggiunto
-  },
-  descriptionBox: { fontSize: '13px', color: '#bfc0d1', flexGrow: 1, lineHeight: '1.6' },
-  masterNotesBox: { marginTop: '15px', display: 'flex', flexDirection: 'column' },
-  masterNotesTextarea: { width: '100%', boxSizing: 'border-box', minHeight: '80px', background: '#121212', border: `1px solid #60519b`, color: '#bfc0d1', padding: '8px', borderRadius: '4px' },
-  divider: { height: '1px', background: `linear-gradient(to right, transparent, #60519b, transparent)`, margin: '20px 0', border: 'none' },
-  presentiBox: { backgroundColor: '#2a292f', padding: '15px', borderRadius: '5px', border: '1px solid #31323e', fontFamily: 'OpenRing, sans-serif', color: '#ffd700', fontSize: '13px'},
 };
 
 function ChatWindow({ chat, onClose, user }) {
@@ -88,28 +148,12 @@ function ChatWindow({ chat, onClose, user }) {
   const [currentMessage, setCurrentMessage] = useState("");
   const [currentLuogo, setCurrentLuogo] = useState("");
   
-  const [position, setPosition] = useState(null); 
-  const [isDragging, setIsDragging] = useState(false);
   const [showDiceMenu, setShowDiceMenu] = useState(false);
   const [globalGifKey, setGlobalGifKey] = useState(0);
   const [isShinigamiPanelOpen, setIsShinigamiPanelOpen] = useState(false);
   const [activeQuest, setActiveQuest] = useState(null);
 
-  const [hoverStates, setHoverStates] = useState({
-    dice: false,
-    shinigami: false,
-    global: false,
-  });
-
-  const dragOffset = useRef({ x: 0, y: 0 });
-  const diceMenuRef = useRef(null);
   const messagesContainerRef = useRef(null);
-
-  useEffect(() => {
-    const windowWidth = 1600; const windowHeight = 810;
-    const screenWidth = window.innerWidth; const screenHeight = window.innerHeight;
-    setPosition({ x: (screenWidth - windowWidth) / 2, y: (screenHeight - windowHeight) / 1.2 });
-  }, []);
 
   useEffect(() => {
     const fetchLocationDetails = async () => { try { const response = await api.get(`/locations/${chat.id}`); setLocationDetails(response.data); setMasterNotes(response.data.master_notes || ''); } catch (error) { console.error("Errore recupero dettagli location", error); } };
@@ -131,122 +175,117 @@ function ChatWindow({ chat, onClose, user }) {
   const handleSendMessage = (messageType) => {
     if (currentMessage.trim() === "") return;
     const finalMessageType = (activeQuest && ['MASTER', 'ADMIN'].includes(user.permesso) && messageType === 'azione') ? 'masterscreen' : messageType;
-    
-    const messageData = { 
-        chatId: chat.id, 
-        testo: currentMessage, 
-        tipo: finalMessageType, 
-        luogo: currentLuogo,
-        quest_id: activeQuest ? activeQuest.questId : null 
-    };
+    const messageData = { chatId: chat.id, testo: currentMessage, tipo: finalMessageType, luogo: currentLuogo, quest_id: activeQuest ? activeQuest.questId : null };
     socket.emit('send_message', messageData);
     setCurrentMessage("");
   };
 
   const handleFormSubmit = (e) => { e.preventDefault(); handleSendMessage('azione'); };
-  
   const handleSaveNotes = async () => { try { await api.put(`/chats/${chat.id}/notes`, { master_notes: masterNotes }); alert('Note salvate!'); } catch (error) { console.error("Errore salvataggio note", error); } };
-  const handleMouseDown = useCallback((e) => { setIsDragging(true); dragOffset.current = { x: e.clientX - position.x, y: e.clientY - position.y }; }, [position]);
-  const handleMouseMove = useCallback((e) => { if (isDragging) setPosition({ x: e.clientX - dragOffset.current.x, y: e.clientY - dragOffset.current.y }); }, [isDragging]);
-  const handleMouseUp = useCallback(() => setIsDragging(false), []);
-  useEffect(() => {
-    if (isDragging) { document.addEventListener('mousemove', handleMouseMove); document.addEventListener('mouseup', handleMouseUp); }
-    return () => { document.removeEventListener('mousemove', handleMouseMove); document.removeEventListener('mouseup', handleMouseUp); };
-  }, [isDragging, handleMouseMove, handleMouseUp]);
+  
   const handleDiceRoll = (diceType) => { socket.emit('roll_dice', { chatId: chat.id, diceType: diceType }); setShowDiceMenu(false); };
   const handleGlobalClick = () => { handleSendMessage('globale'); setGlobalGifKey(prevKey => prevKey + 1); };
   const handleQuestStart = (questData) => { setActiveQuest(questData); setIsShinigamiPanelOpen(false); };
   const handleQuestEnd = () => { setActiveQuest(null); };
 
-  const handleMouseEnter = (key) => setHoverStates(prev => ({ ...prev, [key]: true }));
-  const handleMouseLeave = (key) => setHoverStates(prev => ({ ...prev, [key]: false }));
-
-
-  if (!position) { return null; }
+  const handleToolClick = () => { alert("Funzionalità Skill/Oggetti in arrivo!"); };
 
   return (
-    <div style={{ ...styles.window, left: `${position.x}px`, top: `${position.y}px` }}>
+    // NOTA: La posizione è gestita da gridArea in styles.window
+    <div style={styles.window}>
       {isShinigamiPanelOpen && <ShinigamiPanel onClose={() => setIsShinigamiPanelOpen(false)} participants={usersInRoom} user={user} activeQuest={activeQuest} onQuestStart={handleQuestStart} onQuestEnd={handleQuestEnd} />}
-      <div style={styles.header} onMouseDown={handleMouseDown}>
-        <span>{locationDetails?.name || chat.name}{activeQuest && ' [QUEST ATTIVA]'}</span>
-        <button onClick={() => onClose(chat.id)}>X</button>
+      
+      <div style={styles.header}>
+        <div style={styles.headerTitle}>
+             <span style={{color:'#60519b'}}>💬</span>
+             {locationDetails?.name || chat.name}
+             {activeQuest && <span style={{color:'#ff4d4d', fontSize:'10px', border:'1px solid #ff4d4d', padding:'2px 5px', borderRadius:'3px'}}>QUEST ATTIVA</span>}
+        </div>
+        <button style={styles.closeBtn} onClick={() => onClose(chat.id)}>✕</button>
       </div>
+
       <div style={styles.mainContent}>
+        {/* COLONNA SX */}
         <div style={styles.leftColumn}>
           <img src={locationDetails?.image_url || '/placeholder.jpg'} alt={locationDetails?.name} style={styles.chatImage} />
-          <div style={styles.descriptionBox}><p>{locationDetails?.description || 'Nessuna descrizione.'}</p></div>
-          {['MASTER', 'ADMIN'].includes(user.permesso) && (<div style={styles.masterNotesBox}><label>Note Master:</label><textarea style={styles.masterNotesTextarea} value={masterNotes} onChange={(e) => setMasterNotes(e.target.value)}></textarea><button onClick={handleSaveNotes} style={{marginTop: '5px'}}>Salva Note</button></div>)}
-          <hr style={styles.divider} /><button>Tool Chat</button><hr style={styles.divider} />
-          <div style={styles.presentiBox}><strong>Presenti ({usersInRoom.length}):</strong><ul>{usersInRoom.map(u => <li key={u.id}>{u.nome_pg}</li>)}</ul></div>
+          <div style={styles.descriptionBox}>{locationDetails?.description || 'Nessuna descrizione.'}</div>
+          
+          <button style={styles.toolButton} onClick={handleToolClick}>
+              <span>✦ SKILL & ITEMS</span>
+          </button>
+
+          {['MASTER', 'ADMIN'].includes(user.permesso) && (
+             <div style={{marginBottom:'15px', display:'flex', flexDirection:'column', gap:'5px'}}>
+                <textarea 
+                    style={{...styles.messageInput, height:'60px', fontSize:'11px'}} 
+                    value={masterNotes} onChange={(e) => setMasterNotes(e.target.value)} 
+                    placeholder="Note Master..."
+                />
+                <button onClick={handleSaveNotes} style={{...styles.button, height:'25px', fontSize:'10px', padding:'0'}}>SALVA NOTE</button>
+             </div>
+          )}
+          
+          <div style={styles.presentiBox}>
+              <div style={styles.presentiTitle}>PRESENTI ({usersInRoom.length})</div>
+              <ul style={styles.presentiList}>
+                  {usersInRoom.map(u => <li key={u.id}>• {u.nome_pg}</li>)}
+              </ul>
+          </div>
         </div>
 
+         {/* COLONNA DX (Chat & Input) */}
          <div style={styles.rightColumn}>
           <div style={styles.messages} ref={messagesContainerRef}>
             {messages.map((msg, i) => <ChatMessage key={i} msg={msg} />)}
           </div>
+          
           <div style={styles.inputArea}>
             <form onSubmit={handleFormSubmit} style={styles.form}>
                 <input
-                    type="text"
-                    placeholder="Luogo..."
-                    style={styles.luogoInput}
-                    value={currentLuogo}
-                    onChange={(e) => setCurrentLuogo(e.target.value)}
+                    type="text" placeholder="Luogo..." style={styles.luogoInput}
+                    value={currentLuogo} onChange={(e) => setCurrentLuogo(e.target.value)}
                 />
                 <textarea 
-                    placeholder="Scrivi un'azione..." 
-                    style={styles.messageInput} 
-                    value={currentMessage} 
-                    onChange={(e) => setCurrentMessage(e.target.value)} 
+                    placeholder="Scrivi la tua azione..." style={styles.messageInput} 
+                    value={currentMessage} onChange={(e) => setCurrentMessage(e.target.value)} 
                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleFormSubmit(e); } }}
                     rows="1"
                 />
-                <button type="submit" style={styles.button}>Invia</button>
+                <button type="submit" style={styles.button}>INVIA</button>
             </form>
+            
             <div style={styles.bottomBar}>
-              <div style={styles.diceDropdownContainer} ref={diceMenuRef}>
-                <button
-                  style={{...styles.iconButton, ...(hoverStates.dice && styles.iconButtonHover)}}
-                  onMouseEnter={() => handleMouseEnter('dice')}
-                  onMouseLeave={() => handleMouseLeave('dice')}
-                  onClick={() => setShowDiceMenu(!showDiceMenu)} title="Lancia i dadi"
-                >
-                    <img src="/buttons/chat/dice-cube.png" alt="Diceroller" style={styles.icon} />
-                </button>
-                {showDiceMenu && (
-                  <div style={styles.diceDropdownMenu}>
-                    <button style={styles.diceButton} onClick={() => handleDiceRoll(6)}>D6</button>
-                    <button style={styles.diceButton} onClick={() => handleDiceRoll(10)}>D10</button>
-                    <button style={styles.diceButton} onClick={() => handleDiceRoll(20)}>D20</button>
-                    <button style={styles.diceButton} onClick={() => handleDiceRoll(100)}>D100</button>
+              <div style={styles.toolsLeft}>
+                  {/* DADI */}
+                  <div style={styles.diceDropdownContainer}>
+                    <button style={styles.iconButton} onClick={() => setShowDiceMenu(!showDiceMenu)} title="Dadi">
+                        <img src="/buttons/chat/dice-cube.png" alt="Dadi" style={styles.icon} />
+                    </button>
+                    {showDiceMenu && (
+                      <div style={styles.diceDropdownMenu}>
+                        <button style={styles.diceButton} onClick={() => handleDiceRoll(6)}>D6</button>
+                        <button style={styles.diceButton} onClick={() => handleDiceRoll(10)}>D10</button>
+                        <button style={styles.diceButton} onClick={() => handleDiceRoll(20)}>D20</button>
+                        <button style={styles.diceButton} onClick={() => handleDiceRoll(100)}>D100</button>
+                      </div>
+                    )}
                   </div>
-                )}
+                  
+                  {/* SHINIGAMI */}
+                  {['MASTER', 'ADMIN'].includes(user.permesso) && (
+                    <button style={styles.iconButton} title="Shinigami" onClick={() => setIsShinigamiPanelOpen(true)}>
+                        <img src="/buttons/chat/shinigamitool.png" alt="Shinigami" style={styles.icon} />
+                    </button>
+                  )}
+                  
+                  {/* GLOBALE */}
+                  {user.permesso === 'ADMIN' && (
+                    <button style={styles.iconButton} title="Globale" onClick={handleGlobalClick}>
+                        <img src="/buttons/chat/mondalmessage.png" key={globalGifKey} alt="Globale" style={styles.icon} />
+                    </button>
+                  )}
               </div>
-              
-              {['MASTER', 'ADMIN'].includes(user.permesso) && (
-                <button
-                  title="Modalità Shinigami"
-                  style={{...styles.iconButton, ...(hoverStates.shinigami && styles.iconButtonHover)}}
-                  onMouseEnter={() => handleMouseEnter('shinigami')}
-                  onMouseLeave={() => handleMouseLeave('shinigami')}
-                  onClick={() => setIsShinigamiPanelOpen(true)}
-                >
-                    <img src="/buttons/chat/shinigamitool.png" alt="Modalità Shinigami" style={styles.icon} />
-                </button>
-              )}
-              
-              {user.permesso === 'ADMIN' && (
-                <button
-                  title="Messaggio Globale"
-                  style={{...styles.iconButton, ...(hoverStates.global && styles.iconButtonHover)}}
-                  onMouseEnter={() => handleMouseEnter('global')}
-                  onMouseLeave={() => handleMouseLeave('global')}
-                  onClick={handleGlobalClick}
-                >
-                    <img src="/buttons/chat/mondalmessage.png" key={globalGifKey} alt="Messaggio Globale" style={styles.icon} />
-                </button>
-              )}
-              <span style={styles.charCounter}>{currentMessage.length}</span>
+              <span style={styles.charCounter}>{currentMessage.length} CARATTERI</span>
             </div>
           </div>
         </div>
@@ -256,4 +295,3 @@ function ChatWindow({ chat, onClose, user }) {
 }
 
 export default ChatWindow;
-

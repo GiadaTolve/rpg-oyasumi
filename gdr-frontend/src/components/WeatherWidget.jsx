@@ -2,69 +2,85 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 
 const styles = {
-
+    // --- STILE RINNOVATO (Background Cloudy + Frame) ---
     widget: {
-        backgroundColor: '#2A2930',
-        padding: '10px 15px',
-        borderRadius: '5px',
-        border: '1px solid #60519b',
-        height: '80px',
-        boxSizing: 'border-box',
+        width: '100%',
         display: 'flex',
         flexDirection: 'column',
-        fontFamily: "'Work Sans', sans-serif",
+        alignItems: 'center',
+        fontFamily: "'Inter', sans-serif",
         color: '#bfc0d1',
-        position: 'relative', 
+        position: 'relative',
+        
+        // Background Cloudy con velo scuro
+        backgroundImage: "linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.8)), url('/backgrounds/cloudy.png')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        
+        // Cornice e Spaziatura
+        border: '1px solid rgba(162, 112, 255, 0.2)',
+        borderRadius: '8px',
+        padding: '10px',
+        boxSizing: 'border-box', // Importante per non sbordare col padding
+        boxShadow: 'inset 0 0 20px rgba(0,0,0,0.5)', // Ombra interna per profondità
+        marginBottom: '5px', // Spazio sotto se necessario
     },
 
     dateTime: {
         textAlign: 'center',
         textTransform: 'uppercase',
-        fontSize: '11px',
-        color: '#888',
-        marginBottom: '10px',
+        fontSize: '10px',
+        color: '#c9a84a', // Gold
+        fontFamily: "'Cinzel', serif",
+        marginBottom: '8px',
+        letterSpacing: '1px',
+        width: '100%',
+        borderBottom: '1px solid rgba(255,255,255,0.1)', // Linea più visibile
+        paddingBottom: '5px',
     },
 
     weatherInfo: {
         display: 'flex',
-        alignItems: 'left',
-        justifyContent: 'left',
-        marginLeft: '15px',
-        gap: '25px',
-        flexGrow: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '15px',
+        width: '100%',
+        paddingBottom: '5px',
     },
+    
     weatherIcon: {
-        marginTop: '-12px',
-        width: '42px',
+        width: '42px', // Leggermente più grande per importanza
         height: '42px',
-        textShadow: '1px 1px 2px rgba(0, 0, 0, 0.7)',
-        filter: 'drop-shadow(0 0 8px rgba(8, 8, 8, 0.33)) drop-shadow(0 0 15px rgb(0, 0, 0))',
+        filter: 'drop-shadow(0 0 8px rgba(255, 255, 255, 0.4))',
     },
+    
     temp: {
-        fontSize: '24px',
+        fontSize: '26px', // Un po' più grande
         fontWeight: 'bold',
+        fontFamily: "'Cinzel', serif",
+        color: '#e6e0ff',
+        textShadow: '0 0 10px rgba(162, 112, 255, 0.5)',
     },
-    // --- STILI MODIFICATI PER L'ICONA CALENDARIO ---
+
+    // Bottone Calendario (Renderizzato solo se serve)
     calendarButton: {
         position: 'absolute',
-        top: '10px', // Posizionamento in alto a destra
-        right: '6px',
-        width: '62px', // Stessa dimensione dell'icona meteo
-        height: '62px',
+        top: '35px', 
+        right: '10px',
         background: 'none',
         border: 'none',
         padding: '0',
         cursor: 'pointer',
-        transition: 'transform 0.2s ease', // Transizione per l'effetto click
+        opacity: 0.7,
+        transition: 'transform 0.2s ease, opacity 0.2s',
     },
     calendarIcon: {
-        width: '100%',
-        height: '100%',
-        filter: 'drop-shadow(1px 2px 5px rgba(0, 0, 0, 0.86))', // Ombra scura
+        width: '20px',
+        height: '20px',
+        filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.5))',
     },
 };
 
-// Aggiungiamo 'onToggleCalendar' come prop
 function WeatherWidget({ currentMap, onToggleCalendar }) { 
     const [weather, setWeather] = useState(null);
     const [time, setTime] = useState(new Date());
@@ -93,23 +109,27 @@ function WeatherWidget({ currentMap, onToggleCalendar }) {
     return (
         <div style={styles.widget}>
             <div style={styles.dateTime}>{formattedDate} - {formattedTime}</div>
+            
             {weather ? (
                 <div style={styles.weatherInfo}>
                     <img src={`/meteo/${weather.icon}`} alt={weather.description} style={styles.weatherIcon} />
                     <div style={styles.temp}>{weather.temp}°C</div>
                 </div>
             ) : (
-                <div style={{...styles.weatherInfo, fontSize: '12px'}}>Caricamento...</div>
+                <div style={{...styles.weatherInfo, fontSize: '11px', fontStyle: 'italic'}}>
+                    Caricamento meteo...
+                </div>
             )}
             
-            {/* --- ICONA CALENDARIO ORA È UN BOTTONE --- */}
-            <button 
-                style={styles.calendarButton} 
-                onClick={onToggleCalendar} // Funzione per aprire/chiudere il riquadro
-                title="Eventi del giorno"
-            >
-                <img src="/meteo/calendar.png" alt="Calendario Eventi" style={styles.calendarIcon} />
-            </button>
+            {onToggleCalendar && (
+                <button 
+                    style={styles.calendarButton} 
+                    onClick={onToggleCalendar} 
+                    title="Eventi del giorno"
+                >
+                    <img src="/meteo/calendar.png" alt="Calendario" style={styles.calendarIcon} />
+                </button>
+            )}
         </div>
     );
 }

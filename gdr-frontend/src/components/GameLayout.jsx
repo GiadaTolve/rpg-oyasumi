@@ -6,42 +6,52 @@ import RightSidebar from './RightSidebar';
 import ChatWindow from './ChatWindow';
 import SchedaPersonaggio from './SchedaPersonaggio';
 import Banca from './Banca';
-// 1. Importa i nuovi componenti finestra
 import Guida from './Guida';
 import Ambientazione from './Ambientazione';
 import Shinigami from './Shinigami';
-import MessagingManager from './MessagingManager'; // <-- AGGIUNTO
+import MessagingManager from './MessagingManager';
 import api from '../api';
 
 function GameLayout({ user, onLogout }) {
-    // Stati esistenti
+    // --- STATI ---
     const [openChats, setOpenChats] = useState([]);
     const [currentMap, setCurrentMap] = useState(null);
     const [currentChildren, setCurrentChildren] = useState([]);
     const [mapId, setMapId] = useState('root');
+    
+    // Stati Finestre
     const [isSchedaOpen, setIsSchedaOpen] = useState(false);
     const [isBancaOpen, setIsBancaOpen] = useState(false);
-    
-    // --- NUOVO: Stato per la messaggistica ---
     const [isMessagingOpen, setIsMessagingOpen] = useState(false);
-
-    // 2. Aggiungi gli stati per le nuove finestre
     const [isGuidaOpen, setIsGuidaOpen] = useState(false);
     const [isAmbientazioneOpen, setIsAmbientazioneOpen] = useState(false);
     const [isShinigamiOpen, setIsShinigamiOpen] = useState(false);
 
-    // Funzioni di toggle esistenti
-    const handleToggleScheda = () => setIsSchedaOpen(!isSchedaOpen);
-    const handleToggleBanca = () => setIsBancaOpen(!isBancaOpen);
-    
-    // --- NUOVO: Handler per la messaggistica ---
-    const handleToggleMessages = () => setIsMessagingOpen(!isMessagingOpen);
+    const [schedaTargetUser, setSchedaTargetUser] = useState(null);
 
-    // 3. Aggiungi le nuove funzioni di toggle
+    // --- TOGGLE HANDLERS ---
+    const handleToggleScheda = () => {
+        if (isSchedaOpen) {
+            setIsSchedaOpen(false);
+            setSchedaTargetUser(null);
+        } else {
+            setSchedaTargetUser(null);
+            setIsSchedaOpen(true);
+        }
+    };
+
+    const handleOpenPublicScheda = (targetUser) => {
+        setSchedaTargetUser(targetUser);
+        setIsSchedaOpen(true);
+    };
+
+    const handleToggleBanca = () => setIsBancaOpen(!isBancaOpen);
+    const handleToggleMessages = () => setIsMessagingOpen(!isMessagingOpen);
     const handleToggleGuida = () => setIsGuidaOpen(!isGuidaOpen);
     const handleToggleAmbientazione = () => setIsAmbientazioneOpen(!isAmbientazioneOpen);
     const handleToggleShinigami = () => setIsShinigamiOpen(!isShinigamiOpen);
     
+    // --- LOGICA MAPPA ---
     useEffect(() => {
         const fetchMapData = async () => {
             try {
@@ -78,7 +88,7 @@ function GameLayout({ user, onLogout }) {
 
     return (
         <div className="game-container">
-            {/* 4. Passa le nuove funzioni all'Header */}
+            {/* HEADER */}
             <Header 
                 user={user} 
                 onLogout={onLogout}
@@ -87,32 +97,51 @@ function GameLayout({ user, onLogout }) {
                 onToggleShinigami={handleToggleShinigami}
             />
             
+            {/* LEFT SIDEBAR */}
             <LeftSidebar 
                 onToggleScheda={handleToggleScheda} 
                 onToggleBanca={handleToggleBanca}
-                onToggleMessages={handleToggleMessages} // <-- AGGIUNTO: Prop per la messaggistica
+                onToggleMessages={handleToggleMessages}
             />
 
+            {/* MAIN CONTENT (Mappa) */}
             <main className="main-content">
                 <div className="content-wrapper">
-                    <Outlet context={{ map: currentMap, children: currentChildren, onZoneClick: handleZoneClick, onGoBack: handleGoBack }} />
+                    <Outlet context={{ 
+                        map: currentMap, 
+                        children: currentChildren, 
+                        onZoneClick: handleZoneClick, 
+                        onGoBack: handleGoBack 
+                    }} />
                 </div>
             </main>
 
-            <RightSidebar currentMap={currentMap} />
+            {/* RIGHT SIDEBAR */}
+            <RightSidebar 
+                currentMap={currentMap} 
+                onOpenChat={handleZoneClick} 
+                onOpenScheda={handleOpenPublicScheda} 
+            />
             
-            {/* 5. Renderizza le finestre in modo condizionale */}
-            {isSchedaOpen && <SchedaPersonaggio user={user} onClose={handleToggleScheda} />}
+            {/* --- FINESTRE MODALI --- */}
+            {isSchedaOpen && (
+                <SchedaPersonaggio 
+                    user={user} 
+                    targetUser={schedaTargetUser}
+                    onClose={() => { setIsSchedaOpen(false); setSchedaTargetUser(null); }} 
+                />
+            )}
+
             {isBancaOpen && <Banca user={user} onClose={handleToggleBanca} />}
-            {isGuidaOpen && <Guida onClose={handleToggleGuida} />}
-            {isAmbientazioneOpen && <Ambientazione onClose={handleToggleAmbientazione} />}
+            {isGuidaOpen && <Guida onClose={handleToggleGuida} user={user} />}
+            {isAmbientazioneOpen && <Ambientazione onClose={handleToggleAmbientazione} user={user} />}
             {isShinigamiOpen && <Shinigami onClose={handleToggleShinigami} />}
             
-            {/* --- NUOVO: MESSAGING MANAGER --- */}
             {isMessagingOpen && <MessagingManager isVisible={isMessagingOpen} onClose={handleToggleMessages} />}
 
-
-            <div className="chat-windows-area">
+            {/* --- CHAT WINDOWS (CORRETTO: Uso Fragment <> invece di div) --- */}
+            {/* Questo permette alla ChatWindow di essere figlia diretta della griglia */}
+            <>
                 {openChats.map(chat => (
                     <ChatWindow 
                         key={chat.id} 
@@ -121,7 +150,7 @@ function GameLayout({ user, onLogout }) {
                         user={user}
                     />
                 ))}
-            </div>
+            </>
         </div>
     );
 }

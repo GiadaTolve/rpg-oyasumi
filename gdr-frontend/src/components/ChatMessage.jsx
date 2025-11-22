@@ -1,136 +1,199 @@
 import React from 'react';
 import TextParser from './TextParser.jsx';
 
-// --- STILI AGGIORNATI E COMPLETI ---
-// Questi stili implementano il nuovo layout che hai richiesto
+// --- STILI MESSAGGIO (Dark Fantasy) ---
 const styles = {
-  // Contenitore principale del messaggio, ora occupa tutta la larghezza
   messageContainer: { 
     width: '100%',
-    marginBottom: '25px', // Spazio tra un messaggio e l'altro
-    color: '#a4a5b9', // Colore del testo di base
+    marginBottom: '20px', 
+    color: '#b3b3c0', 
+    position: 'relative',
+    paddingLeft: '10px', // Leggero rientro
   },
-  // Header del messaggio: contiene data, nome e luogo
+  
+  // HEADER: Data | Nome | Luogo
   header: {
     display: 'flex',
     alignItems: 'center',
-    marginBottom: '8px',
-    fontSize: '13px',
-    color: '#bfc0d1', // Colore più chiaro per le informazioni importanti
+    marginBottom: '6px',
+    fontSize: '12px',
+    borderBottom: '1px solid rgba(255,255,255,0.05)', // Linea sottilissima divisoria
+    paddingBottom: '4px',
+    width: '100%',
   },
   timestamp: {
-    marginRight: '10px',
-    fontSize: '11px',
-    color: '#888', // Grigio per l'orario
+    marginRight: '12px',
+    fontSize: '10px',
+    color: '#666', 
+    fontFamily: "'Inter', sans-serif",
   },
   author: { 
-    fontWeight: 'bold', 
+    fontFamily: "'Cinzel', serif",
+    fontWeight: '700', 
+    color: '#c9a84a', // ORO
     marginRight: '10px',
+    letterSpacing: '0.5px',
+    fontSize: '13px',
   },
   luogoTag: {
-    backgroundColor: 'rgba(96, 81, 155, 0.4)', // Sfondo viola semitrasparente
-    border: '1px solid #60519b', // Bordo viola
-    padding: '2px 8px',
-    borderRadius: '10px',
-    fontSize: '11px',
+    backgroundColor: 'rgba(162, 112, 255, 0.1)', // Viola chiarissimo
+    border: '1px solid rgba(162, 112, 255, 0.3)', 
+    color: '#a270ff',
+    padding: '1px 6px',
+    borderRadius: '2px',
+    fontSize: '10px',
+    fontFamily: "'Inter', sans-serif",
+    textTransform: 'uppercase',
   },
-  // Contenitore per il contenuto principale (avatar e testo)
+
+  // CONTENUTO: Avatar + Testo
   content: { 
-    // Questa proprietà CSS moderna permette di contenere elementi "fluttuanti" (come l'avatar)
-    // senza bisogno di altri hack.
-    display: 'flow-root', 
+    display: 'flow-root', // Mantiene il float contenuto
   },
-  // Nuovo stile per l'avatar, come da tue specifiche
+  
+  // AVATAR: Riquadro Elegante
   avatar: { 
-    width: '120px',
-    height: '50px', 
-    borderRadius: '8px', 
+    width: '100px', // Un po' più piccolo per eleganza
+    height: '100px', 
+    borderRadius: '4px', 
     marginRight: '15px', 
-    marginBottom: '5px', // Aggiunge un piccolo spazio sotto l'avatar
-    border: '2px solid #60519b', // Bordo viola, come richiesto
-    objectFit: 'cover', // Assicura che l'immagine riempia lo spazio
-    float: 'left', // La magia: l'avatar "galleggia" a sinistra e il testo gli scorre accanto
+    marginBottom: '5px', 
+    
+    // Doppio bordo (Immagine + Box Shadow)
+    border: '1px solid #c9a84a', 
+    boxShadow: '0 0 5px rgba(201, 168, 74, 0.3)',
+    
+    objectFit: 'cover', 
+    float: 'left', 
   },
-  // Stile per il blocco di testo
+  
+  // TESTO: Inter pulito
   text: { 
     margin: 0, 
     lineHeight: '1.6', 
-    whiteSpace: 'pre-wrap', // Mantiene gli "a capo" e gli spazi multipli
-    wordBreak: 'break-word', // Va a capo se una parola è troppo lunga
+    whiteSpace: 'pre-wrap', 
+    wordBreak: 'break-word', 
+    fontFamily: "'Inter', sans-serif",
+    fontSize: '13px',
+    color: '#7d7f7d', // Grigio quasi bianco per leggibilità
   },
-  // Stili speciali per DADO, MASTERSCREEN e GLOBALE (invariati)
+
+  // TIPI SPECIALI
   dado: { 
     padding: '10px', 
-    backgroundColor: 'rgba(49, 50, 60, 0.5)', 
+    backgroundColor: 'rgba(20, 20, 25, 0.8)', 
     borderLeft: '3px solid #60519b', 
-    color: '#bfc0d1', 
-    fontWeight: 'bold' 
+    color: '#a270ff', 
+    fontWeight: 'bold',
+    marginTop: '5px',
+    borderRadius: '0 4px 4px 0'
   },
-  masterscreen: { 
-    border: '1px dashed #60519b', 
-    padding: '10px', 
-    color: '#bfc0d1', 
-    fontStyle: 'italic' 
+
+  // --- NUOVO STILE SHINIGAMI (MASTERSCREEN) ---
+  masterscreenContainer: {
+    width: '100%',
+    marginBottom: '25px',
+    padding: '20px',
+    boxSizing: 'border-box',
+    backgroundColor: 'rgba(20, 20, 25, 0.4)', // Sfondo scuro leggero
+    border: '1px solid rgba(201, 168, 74, 0.3)', // Bordo Oro Sottile
+    borderRadius: '4px',
+    boxShadow: 'inset 0 0 20px rgba(0,0,0,0.5)',
+    position: 'relative',
   },
+  masterscreenText: {
+    fontFamily: "'Inter', sans-serif",
+    fontStyle: 'italic',
+    fontSize: '13px',
+    color: '#ffe7a3', // Oro pallido per il testo
+    lineHeight: '1.7',
+    whiteSpace: 'pre-wrap',
+    marginBottom: '15px', // Spazio per la firma
+  },
+  masterscreenSignature: {
+    textAlign: 'right',
+    fontFamily: "'Cinzel', serif",
+    fontSize: '11px',
+    fontWeight: 'bold',
+    color: '#c9a84a', // Oro più carico
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+    opacity: 0.8,
+  },
+
   globale: { 
-    border: '2px solid #60519b', 
-    padding: '10px', 
-    color: '#bfc0d1', 
-    fontWeight: 'bold', 
+    border: '1px solid #a270ff', 
+    background: 'linear-gradient(90deg, rgba(96, 81, 155, 0.2), rgba(0,0,0,0) 50%, rgba(96, 81, 155, 0.2))',
+    padding: '15px', 
+    color: '#e6e0ff', 
     textAlign: 'center', 
-    margin: '15px 0' 
+    margin: '20px 0',
+    fontFamily: "'Cinzel', serif",
   },
 };
 
-// Funzione helper per formattare la data e l'ora
 const formatTimestamp = (isoString) => {
-    if (!isoString) return '';
-    const date = new Date(isoString);
-    // Estrae solo l'ora e i minuti in formato HH:MM
-    return date.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  return date.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 };
 
 function ChatMessage({ msg }) {
-  // Gestione speciale per il MESSAGGIO GLOBALE (rimane a sé stante)
-  if (msg.tipo === 'globale') {
-    return (
-      <div style={styles.globale}>
-        <strong>[MESSAGGIO GLOBALE di {msg.autore}]</strong>
-        <p style={{margin: '5px 0 0 0', fontWeight: 'normal'}}>{msg.testo}</p>
-      </div>
-    );
-  }
 
-  // NUOVO LAYOUT per tutti gli altri tipi di messaggio
+// 1. MESSAGGIO GLOBALE (Admin)
+if (msg.tipo === 'globale') {
   return (
-    <div style={styles.messageContainer}>
-        {/* Riga 1: Header con metadata (orario, autore, luogo) */}
-        <div style={styles.header}>
-            <span style={styles.timestamp}>{formatTimestamp(msg.timestamp)}</span>
-            <span style={styles.author}>{msg.autore}</span>
-            {/* Qui puoi aggiungere i simboli del PG se li hai in una variabile */}
-            {msg.luogo && msg.luogo.trim() !== '' && (
-                <span style={styles.luogoTag}>[{msg.luogo}]</span>
-            )}
-        </div>
-
-        {/* Riga 2: Contenuto principale con avatar flottante e testo */}
-        <div style={styles.content}>
-            <img 
-                // Usa l'avatar specifico del messaggio se esiste, altrimenti un'immagine di default
-                src={msg.avatar_url || '/icone/mini_avatar.png'} 
-                alt={msg.autore} 
-                style={styles.avatar}
-            />
-            {/* Il div del testo ora eredita lo stile base più quello specifico del tipo */}
-            <div style={{...styles.text, ...styles[msg.tipo]}}>
-                {msg.tipo === 'dado' && '🎲 '}
-                {msg.tipo === 'masterscreen' && <strong>[MASTERSCREEN] </strong>}
-                <TextParser text={msg.testo} />
-            </div>
-        </div>
+    <div style={styles.globale}>
+      <strong style={{color:'#a270ff', display:'block', marginBottom:'5px', fontSize:'14px'}}>
+          ✦ MESSAGGIO GLOBALE ✦
+      </strong>
+      <p style={{margin: 0, fontWeight: 'normal', fontFamily: "'Inter', sans-serif"}}>{msg.testo}</p>
     </div>
   );
+}
+
+// 2. MESSAGGIO SHINIGAMI (Masterscreen)
+// Layout completamente diverso: niente avatar, niente header standard.
+if (msg.tipo === 'masterscreen') {
+    return (
+        <div style={styles.masterscreenContainer}>
+            {/* Testo del master */}
+            <div style={styles.masterscreenText}>
+                <TextParser text={msg.testo} />
+            </div>
+            
+            {/* Firma in basso a destra */}
+            <div style={styles.masterscreenSignature}>
+                — Shinigami ({msg.autore})
+            </div>
+        </div>
+    );
+}
+
+// 3. MESSAGGIO STANDARD (Giocatori)
+return (
+  <div style={styles.messageContainer}>
+      <div style={styles.header}>
+          <span style={styles.timestamp}>{formatTimestamp(msg.timestamp)}</span>
+          <span style={styles.author}>{msg.autore}</span>
+          {msg.luogo && msg.luogo.trim() !== '' && (
+              <span style={styles.luogoTag}>{msg.luogo}</span>
+          )}
+      </div>
+
+      <div style={styles.content}>
+          <img 
+              src={msg.avatar_url || '/icone/mini_avatar.png'} 
+              alt={msg.autore} 
+              style={styles.avatar}
+          />
+          <div style={{...styles.text, ...(msg.tipo === 'dado' ? styles.dado : {})}}>
+              {msg.tipo === 'dado' && '🎲 '}
+              <TextParser text={msg.testo} />
+          </div>
+      </div>
+  </div>
+);
 }
 
 export default ChatMessage;

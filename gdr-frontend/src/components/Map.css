@@ -1,0 +1,217 @@
+/* Map.css - CLEAN VERSION */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;600&display=swap');
+
+/* ROOT MAP */
+.root-map-container {
+    width: 100%; height: 100%; position: relative;
+    background-size: cover; background-position: center; overflow: hidden;
+}
+.map-pin-wrapper {
+    position: absolute; transform: translate(-50%, -100%);
+    display: flex; flex-direction: column; align-items: center; cursor: pointer; z-index: 10;
+    transition: transform 0.2s ease;
+}
+.map-pin-wrapper:hover { transform: translate(-50%, -115%) scale(1.1); z-index: 20; }
+.pin-icon { width: 40px; height: auto; filter: drop-shadow(0 4px 4px black); }
+.glass-label {
+    margin-top: 4px; background: rgba(0,0,0,0.8); border: 1px solid #c9a84a;
+    color: #ffe7a3; font-family: 'Cinzel', serif; padding: 4px 10px; border-radius: 4px;
+    font-size: 0.8rem; text-transform: uppercase; white-space: nowrap;
+}
+
+/* SUB MAP LAYOUT */
+.sub-map-wrapper {
+    position: relative; width: 100%; height: 100%;
+    /* Sfondo Darkstone */
+    background-image: url('/backgrounds/darkstone.png');
+    background-repeat: repeat;
+    overflow: hidden;
+}
+
+/* Cornice Esterna */
+.outer-border-frame {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    pointer-events: none; z-index: 50;
+}
+
+/* Griglia Principale */
+.sub-map-content {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px; box-sizing: border-box;
+}
+
+.map-grid {
+    display: grid;
+    /* Colonne: SX (Img) - Centro (Info) - DX (Nav) */
+    grid-template-columns: 400px 1fr 300px; 
+    gap: 30px;
+    width: 100%; max-width: 1400px;
+    align-items: center;
+}
+
+.col-image {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%; /* Assicura che la colonna usi lo spazio */
+}
+
+.depth-wrapper {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    filter: drop-shadow(0 10px 20px rgba(0,0,0,0.6));
+}
+
+.image-frame-container {
+    position: relative;
+    /* Larghezza massima: regola questo se vuoi l'immagine più grande o piccola */
+    width: 100%; 
+    max-width: 250px; 
+
+    /* ALTEZZA AUTOMATICA: Questo è il segreto. 
+       Il contenitore diventerà alto quanto serve per non deformare l'immagine */
+    height: auto; 
+    
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.location-image {
+    width: 100%;  /* Prendi tutta la larghezza del container */
+    height: auto; /* Mantieni le TUE proporzioni originali (niente stretch!) */
+    display: block; /* Rimuove spazi bianchi fantasma sotto le immagini */
+    
+    border-radius: 0; 
+    z-index: 1;
+}
+
+.location-frame-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    
+    /* La cornice si "stira" per coprire esattamente l'immagine sotto.
+       Dato che hai detto che hanno la "perfetta misura", combaceranno. */
+    background-image: url('/frames/map_frame.png');
+    background-size: 100% 100%; 
+    background-repeat: no-repeat;
+    background-position: center;
+    
+    z-index: 2;
+    pointer-events: none;
+}
+
+/* --- CENTRO: Info --- */
+.col-info {
+    display: flex; flex-direction: column; align-items: center;
+    text-align: center;
+    /* Sfondo scuro leggero per staccare dal darkstone */
+    background: radial-gradient(circle, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 70%);
+    padding: 20px;
+}
+
+.info-title {
+    font-family: 'Cinzel', serif;
+    font-size: 2rem;
+    /* ORO SOLIDO (Niente gradiente clip che rompe) */
+    color: #c9a84a; 
+    text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+    margin: 0 0 10px 0;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.divider-img {
+    width: 100%; 
+    max-width: 150px;
+    height: auto;
+    margin: 10px 0;
+    opacity: 0.9; /* Un po' più visibile al centro */
+
+    /* --- EFFETTO ORIZZONTE (SFUMATURA BORDI) --- */
+    /* Sfumiamo il primo 15% e l'ultimo 15% dell'immagine */
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+    
+    /* Aggiungiamo un leggero bagliore dorato per farlo risaltare sullo scuro */
+    filter: drop-shadow(0 0 3px rgba(201, 168, 74, 0.6));
+}
+
+.info-desc-box {
+    font-family: 'Inter', sans-serif;
+    color: #b3b3c0;
+    font-size: 1.1rem;
+    line-height: 1.6;
+    
+    /* Allineamento richiesto */
+    text-align: justify;
+    text-align-last: center; /* L'ultima riga è centrata per estetica */
+    
+    margin: 10px 0;
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 0 15px;
+    
+    /* Nasconde scrollbar brutte (Chrome/Safari) */
+    scrollbar-width: thin;
+    scrollbar-color: #c9a84a transparent;
+}
+
+/* --- DESTRA: Navigazione --- */
+.col-nav {
+    display: flex; flex-direction: column; align-items: center;
+    height: 400px; /* Altezza fissa */
+    overflow-y: auto;
+    padding: 0 10px;
+}
+
+.nav-list {
+    width: 100%; display: flex; flex-direction: column; gap: 15px;
+}
+
+.nav-button {
+    width: 100%; height: 55px;
+    background-image: url('/buttons/bottoni-frame/sidebar.menu.button.png');
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    
+    display: flex; justify-content: center; align-items: center;
+    cursor: pointer;
+    transition: transform 0.2s, filter 0.2s;
+    
+    /* Ombra dietro il bottone */
+    filter: drop-shadow(0 4px 5px rgba(0,0,0,0.5));
+}
+
+.nav-button:hover {
+    transform: scale(1.03);
+    filter: brightness(1.2) drop-shadow(0 0 10px rgba(162, 112, 255, 0.4)); /* Glow viola */
+}
+
+.nav-text {
+    font-family: 'Cinzel', serif;
+    color: #e6e6e6;
+    font-weight: 700;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    text-shadow: 1px 1px 2px black;
+}
+
+/* Pulsante Indietro */
+.floating-back-btn {
+    position: absolute; top: 20px; left: 30px; z-index: 60;
+    background: rgba(0,0,0,0.7); border: 1px solid #c9a84a;
+    color: #c9a84a; font-family: 'Cinzel', serif;
+    padding: 3px 10px; cursor: pointer; border-radius: 4px;
+    transition: 0.3s;
+}
+.floating-back-btn:hover {
+    background: #c9a84a; color: #000; box-shadow: 0 0 15px rgba(201, 168, 74, 0.4);
+}
+
+.empty-text { color: #666; font-style: italic; margin-top: 20px; }
