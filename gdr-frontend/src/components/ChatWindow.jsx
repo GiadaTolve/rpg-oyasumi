@@ -7,25 +7,14 @@ import ShinigamiPanel from './ShinigamiPanel.jsx';
 // --- STILI DARK ARCANE ---
 const styles = {
   window: { 
-    // --- POSIZIONAMENTO GRID (Fondamentale) ---
     gridArea: 'main-content',
-    width: '100%', 
-    height: '100%',
-    margin: 0,
-    // ----------------------------------------
+    width: '100%', height: '100%', margin: 0,
     backgroundColor: 'rgba(11, 11, 17, 0.98)', 
     border: '1px solid rgba(162, 112, 255, 0.2)', 
-    borderRadius: '5px', 
-    display: 'flex', 
-    flexDirection: 'column', 
-    zIndex: 100, // Livello base (sopra la mappa, sotto le modali)
-    boxShadow: '0 0 50px rgba(0, 0, 0, 0.8)', 
-    color: '#b3b3c0', 
-    fontFamily: "'Inter', sans-serif",
-    overflow: 'hidden' 
+    borderRadius: '5px', display: 'flex', flexDirection: 'column', 
+    zIndex: 100, boxShadow: '0 0 50px rgba(0, 0, 0, 0.8)', 
+    color: '#b3b3c0', fontFamily: "'Inter', sans-serif", overflow: 'hidden' 
   },
-
-  // HEADER
   header: { 
     padding: '0 20px', height: '50px',    
     backgroundImage: "linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.8)), url('/backgrounds/cloudy.png')",
@@ -42,36 +31,22 @@ const styles = {
     background: 'none', border: 'none', color: '#b3b3c0', fontFamily: "'Cinzel', serif",
     fontSize: '20px', cursor: 'pointer', transition: 'color 0.2s', padding: '0 5px',
   },
-
-  // LAYOUT INTERNO
   mainContent: { display: 'flex', flexGrow: 1, height: '100%', overflow: 'hidden' },
-  
-  // COLONNA SX (Info)
   leftColumn: { 
     width: '260px', flexShrink: 0, padding: '20px', 
     borderRight: '1px solid rgba(255,255,255,0.05)', 
     display: 'flex', flexDirection: 'column', 
-    backgroundColor: 'rgba(0, 0, 0, 0.3)', 
-    overflowY: 'auto' 
+    backgroundColor: 'rgba(0, 0, 0, 0.3)', overflowY: 'auto' 
   },
-  
-  // COLONNA DX (Messaggi)
-  rightColumn: { 
-    flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', 
-    backgroundColor: 'transparent' 
-  },
+  rightColumn: { flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: 'transparent' },
   messages: { 
     flexGrow: 1, padding: '20px 40px', overflowY: 'auto', 
     backgroundImage: "url('/backgrounds/darkstone.png')", backgroundRepeat: 'repeat', backgroundBlendMode: 'overlay', backgroundColor: 'rgba(0,0,0,0.6)',
     scrollbarWidth: 'thin', scrollbarColor: '#c9a84a transparent'
   },
-
-  // INPUT AREA
   inputArea: { 
-    padding: '15px 20px', 
-    borderTop: '1px solid rgba(162, 112, 255, 0.2)', 
-    backgroundColor: 'rgba(15, 15, 20, 0.95)', 
-    flexShrink: 0, position: 'relative' 
+    padding: '15px 20px', borderTop: '1px solid rgba(162, 112, 255, 0.2)', 
+    backgroundColor: 'rgba(15, 15, 20, 0.95)', flexShrink: 0, position: 'relative' 
   },
   form: { display: 'flex', gap: '10px', alignItems: 'flex-start' },
   luogoInput: {
@@ -91,24 +66,18 @@ const styles = {
     boxSizing: 'border-box', transition: 'all 0.2s', textTransform: 'uppercase', letterSpacing: '1px',
     boxShadow: '0 0 10px rgba(162, 112, 255, 0.3)'
   },
-
-  // BARRA STRUMENTI (Sotto l'input)
-  bottomBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', paddingLeft: '160px' }, // paddingLeft allinea con input
+  bottomBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', paddingLeft: '160px' },
   toolsLeft: { display: 'flex', gap: '8px' },
-  
   iconButton: {
     backgroundColor: 'transparent', border: '1px solid rgba(255,255,255,0.1)', width: '30px', height: '30px',
     padding: '0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', transition: 'all 0.2s ease',
   },
   icon: { width: '18px', height: '18px', filter: 'invert(0.7)' },
-
-  // ELEMENTI SIDEBAR
   chatImage: { 
     width: '100%', height: '140px', objectFit: 'cover', borderRadius: '4px', marginBottom: '15px',
     border: '1px solid rgba(162, 112, 255, 0.3)', filter: 'sepia(0.2) brightness(0.9)',
   },
   descriptionBox: { fontSize: '12px', color: '#b3b3c0', flexGrow: 1, lineHeight: '1.6', fontStyle: 'italic', marginBottom: '15px' },
-  
   toolButton: {
       width: '100%', padding: '10px', marginBottom: '15px',
       background: 'linear-gradient(90deg, rgba(201, 168, 74, 0.1), rgba(201, 168, 74, 0.05))',
@@ -117,17 +86,13 @@ const styles = {
       textTransform: 'uppercase', letterSpacing: '1px', transition: 'all 0.3s ease',
       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
   },
-  
   presentiBox: { 
     backgroundColor: 'rgba(0,0,0,0.3)', padding: '15px', borderRadius: '4px', marginTop: 'auto',
     border: '1px solid rgba(255,255,255,0.05)', 
   },
   presentiTitle: { color: '#c9a84a', fontSize: '11px', fontFamily: "'Cinzel', serif", borderBottom:'1px solid rgba(255,255,255,0.1)', paddingBottom:'5px', marginBottom:'5px', fontWeight:'bold' },
   presentiList: { listStyle: 'none', padding: 0, margin: 0, fontFamily: "'Inter', sans-serif", color: '#b3b3c0', fontSize: '12px' },
-  
   charCounter: { fontSize: '10px', color: '#555', fontFamily: 'monospace' },
-
-  // MENU DADI
   diceDropdownContainer: { position: 'relative' },
   diceDropdownMenu: { 
     position: 'absolute', bottom: '110%', left: 0, backgroundColor: '#1a1a1a', border: '1px solid #c9a84a',
@@ -155,18 +120,75 @@ function ChatWindow({ chat, onClose, user }) {
 
   const messagesContainerRef = useRef(null);
 
+  // --- 1. RECUPERO DETTAGLI LOCATION / CASA ---
   useEffect(() => {
-    const fetchLocationDetails = async () => { try { const response = await api.get(`/locations/${chat.id}`); setLocationDetails(response.data); setMasterNotes(response.data.master_notes || ''); } catch (error) { console.error("Errore recupero dettagli location", error); } };
-    const fetchHistory = async () => { try { const response = await api.get(`/chat/${chat.id}/history`); setMessages(response.data); } catch (error) { console.error("Impossibile caricare la cronologia", error); } };
-    fetchLocationDetails(); fetchHistory();
-    socket.emit('join_chat', chat.id);
-    const handleNewMessage = (data) => { if (data.tipo === 'globale' || data.chatId === chat.id) setMessages(prev => [...prev, data]); };
+    const fetchLocationDetails = async () => {
+        // Controllo se è una casa
+        const isHouseChat = typeof chat.id === 'string' && chat.id.startsWith('house_');
+        const isMap = chat.type === 'MAP';
+
+        try {
+            if (isHouseChat) {
+                // CASO 1: È UNA CASA -> Usiamo la nuova API specifica
+                const response = await api.get(`/housing/chat/${chat.id}`);
+                
+                // Aggiorniamo i dettagli con quelli ricevuti dal server
+                setLocationDetails({
+                    ...response.data,
+                    // Nome composto (es: "Bilocale di Kagetsu")
+                    name: `${response.data.name} di ${response.data.owner}`,
+                    image_url: response.data.image_url || '/placeholder.jpg' // Fallback immagine
+                });
+            } 
+            else if (isMap) {
+                // CASO 2: È UNA MAPPA NORMALE -> API Locations
+                const response = await api.get(`/locations/${chat.id}`);
+                setLocationDetails(response.data);
+                setMasterNotes(response.data.master_notes || '');
+            }
+            // Se non è né mappa né casa (es. chat privata user-to-user), non facciamo nulla.
+
+        } catch (error) {
+            console.error("Errore recupero dettagli location/casa:", error);
+        }
+    };
+
+    const fetchHistory = async () => { 
+        try { 
+            const response = await api.get(`/chat/${chat.id}/history`); 
+            setMessages(response.data); 
+        } catch (error) { 
+            console.error("Impossibile caricare la cronologia", error); 
+        } 
+    };
+
+    // Eseguiamo le chiamate
+    if (chat && chat.id) {
+        fetchLocationDetails();
+        fetchHistory();
+        
+        // Socket Join
+        socket.emit('join_chat', chat.id);
+    }
+
+    const handleNewMessage = (data) => { 
+        if (data.tipo === 'globale' || data.chatId === chat.id) {
+            setMessages(prev => [...prev, data]); 
+        }
+    };
     const handleRoomUsersUpdate = (users) => setUsersInRoom(users);
+
     socket.on('new_message', handleNewMessage);
     socket.on('room_users_update', handleRoomUsersUpdate);
-    return () => { socket.emit('leave_chat', chat.id); socket.off('new_message', handleNewMessage); socket.off('room_users_update', handleRoomUsersUpdate); };
-  }, [socket, chat.id]);
 
+    return () => { 
+        socket.emit('leave_chat', chat.id); 
+        socket.off('new_message', handleNewMessage); 
+        socket.off('room_users_update', handleRoomUsersUpdate); 
+    };
+  }, [socket, chat.id, chat.type]);
+
+  // Scroll automatico
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (container) { container.scrollTop = container.scrollHeight; }
@@ -191,7 +213,6 @@ function ChatWindow({ chat, onClose, user }) {
   const handleToolClick = () => { alert("Funzionalità Skill/Oggetti in arrivo!"); };
 
   return (
-    // NOTA: La posizione è gestita da gridArea in styles.window
     <div style={styles.window}>
       {isShinigamiPanelOpen && <ShinigamiPanel onClose={() => setIsShinigamiPanelOpen(false)} participants={usersInRoom} user={user} activeQuest={activeQuest} onQuestStart={handleQuestStart} onQuestEnd={handleQuestEnd} />}
       
@@ -207,14 +228,14 @@ function ChatWindow({ chat, onClose, user }) {
       <div style={styles.mainContent}>
         {/* COLONNA SX */}
         <div style={styles.leftColumn}>
-          <img src={locationDetails?.image_url || '/placeholder.jpg'} alt={locationDetails?.name} style={styles.chatImage} />
+          <img src={locationDetails?.image_url || '/placeholder.jpg'} alt="Location" style={styles.chatImage} />
           <div style={styles.descriptionBox}>{locationDetails?.description || 'Nessuna descrizione.'}</div>
           
           <button style={styles.toolButton} onClick={handleToolClick}>
               <span>✦ SKILL & ITEMS</span>
           </button>
 
-          {['MASTER', 'ADMIN'].includes(user.permesso) && (
+          {['MASTER', 'ADMIN'].includes(user.permesso) && chat.type === 'MAP' && (
              <div style={{marginBottom:'15px', display:'flex', flexDirection:'column', gap:'5px'}}>
                 <textarea 
                     style={{...styles.messageInput, height:'60px', fontSize:'11px'}} 

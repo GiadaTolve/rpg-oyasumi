@@ -156,7 +156,8 @@ const MenuButton = ({ label, onClick }) => {
 }; 
 
 // --- MAIN COMPONENT ---
-function LeftSidebar({ onToggleScheda, onToggleMessages, onToggleBanca }) { 
+// MODIFICA: Aggiunto onToggleMercato alle props
+function LeftSidebar({ onToggleScheda, onToggleMessages, onToggleBanca, onToggleMercato }) { 
     const { isFlashing } = useMessaging(); 
     const [schedaBreve, setSchedaBreve] = useState(null); 
 
@@ -173,13 +174,9 @@ function LeftSidebar({ onToggleScheda, onToggleMessages, onToggleBanca }) {
     const handleMessageClick = (e) => { e.stopPropagation(); onToggleMessages(); };
 
     return ( 
-        // 1. GUSCIO ESTERNO (Fermo)
         <aside style={styles.outerContainer}> 
-            
-            {/* 2. BORDO DESTRO FISSO */}
             <div style={styles.fixedBorderRight}></div>
 
-            {/* 3. CONTENUTO CHE SCROLLA */}
             <div style={styles.scrollableContent}>
                 
                 {/* BOX PROFILO */}
@@ -205,7 +202,10 @@ function LeftSidebar({ onToggleScheda, onToggleMessages, onToggleBanca }) {
 
                 <div style={styles.menuList}> 
                     <MenuButton label="Banca" onClick={onToggleBanca} /> 
-                    <MenuButton label="Mercato" /> 
+                    
+                    {/* MODIFICA: Collegato al Mercato */}
+                    <MenuButton label="Mercato" onClick={onToggleMercato} /> 
+                    
                     <MenuButton label="Skills" /> 
                     <MenuButton label="Grimorio" /> 
                     <MenuButton label="Bestiario" /> 

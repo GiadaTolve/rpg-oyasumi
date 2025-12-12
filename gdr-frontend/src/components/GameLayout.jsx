@@ -10,6 +10,7 @@ import Guida from './Guida';
 import Ambientazione from './Ambientazione';
 import Shinigami from './Shinigami';
 import MessagingManager from './MessagingManager';
+import Mercato from './Mercato'; 
 import api from '../api';
 
 function GameLayout({ user, onLogout }) {
@@ -26,6 +27,7 @@ function GameLayout({ user, onLogout }) {
     const [isGuidaOpen, setIsGuidaOpen] = useState(false);
     const [isAmbientazioneOpen, setIsAmbientazioneOpen] = useState(false);
     const [isShinigamiOpen, setIsShinigamiOpen] = useState(false);
+    const [isMercatoOpen, setIsMercatoOpen] = useState(false); 
 
     const [schedaTargetUser, setSchedaTargetUser] = useState(null);
 
@@ -44,7 +46,7 @@ function GameLayout({ user, onLogout }) {
         setSchedaTargetUser(targetUser);
         setIsSchedaOpen(true);
     };
-
+    const handleToggleMercato = () => setIsMercatoOpen(!isMercatoOpen); 
     const handleToggleBanca = () => setIsBancaOpen(!isBancaOpen);
     const handleToggleMessages = () => setIsMessagingOpen(!isMessagingOpen);
     const handleToggleGuida = () => setIsGuidaOpen(!isGuidaOpen);
@@ -102,6 +104,7 @@ function GameLayout({ user, onLogout }) {
                 onToggleScheda={handleToggleScheda} 
                 onToggleBanca={handleToggleBanca}
                 onToggleMessages={handleToggleMessages}
+                onToggleMercato={handleToggleMercato}
             />
 
             {/* MAIN CONTENT (Mappa) */}
@@ -129,6 +132,9 @@ function GameLayout({ user, onLogout }) {
                     user={user} 
                     targetUser={schedaTargetUser}
                     onClose={() => { setIsSchedaOpen(false); setSchedaTargetUser(null); }} 
+                    // --- NUOVA PROP FONDAMENTALE ---
+                    onOpenChat={handleZoneClick} 
+                    // -------------------------------
                 />
             )}
 
@@ -136,7 +142,7 @@ function GameLayout({ user, onLogout }) {
             {isGuidaOpen && <Guida onClose={handleToggleGuida} user={user} />}
             {isAmbientazioneOpen && <Ambientazione onClose={handleToggleAmbientazione} user={user} />}
             {isShinigamiOpen && <Shinigami onClose={handleToggleShinigami} />}
-            
+            {isMercatoOpen && (<Mercato user={user} onClose={handleToggleMercato} /> )}
             {isMessagingOpen && <MessagingManager isVisible={isMessagingOpen} onClose={handleToggleMessages} />}
 
             {/* --- CHAT WINDOWS (CORRETTO: Uso Fragment <> invece di div) --- */}

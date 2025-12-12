@@ -4,12 +4,10 @@ import api from '../api';
 // --- STILI DARK ARCANE ---
 const styles = {
     window: { 
-        // --- MODIFICA: Grid Area ---
         gridArea: 'main-content',
         width: '100%',
         height: '100%',
         margin: 0,
-        // ------------------------
         backgroundColor: 'rgba(11, 11, 17, 0.98)', 
         border: '1px solid rgba(162, 112, 255, 0.2)', 
         borderRadius: '5px', 
@@ -40,7 +38,7 @@ const styles = {
         fontSize: '24px', cursor: 'pointer', transition: 'color 0.2s', padding: '0 5px',
     },
 
-    // CORPO PRINCIPALE (Layout 2 Colonne)
+    // CORPO PRINCIPALE
     content: { display: 'flex', flexGrow: 1, overflow: 'hidden' },
     
     // MENU LATERALE
@@ -59,7 +57,7 @@ const styles = {
         transition: 'all 0.2s'
     },
     activeNavButton: { 
-        backgroundColor: 'rgba(162, 112, 255, 0.15)', 
+        background: 'rgba(162, 112, 255, 0.15)', 
         color: '#c9a84a', 
         border: '1px solid rgba(162, 112, 255, 0.3)',
         boxShadow: '0 0 10px rgba(0,0,0,0.2)'
@@ -94,7 +92,7 @@ const styles = {
     amountIn: { color: '#4caf50', fontWeight: 'bold', fontFamily: "'Cinzel', serif" },
     amountOut: { color: '#f44336', fontWeight: 'bold', fontFamily: "'Cinzel', serif" },
 
-    // SEZIONE LAVORO (Arubaito)
+    // SEZIONE LAVORO
     currentJobBox: { 
         textAlign: 'center', padding: '30px', 
         background: 'linear-gradient(45deg, rgba(96, 81, 155, 0.1), rgba(0,0,0,0.2))', 
@@ -154,8 +152,6 @@ function Banca({ user, onClose }) {
     
     const [toaster, setToaster] = useState({ show: false, message: '' });
 
-    // Rimossa useEffect per la posizione e gli stati del drag
-
     const fetchAccountData = useCallback(async () => {
         try {
             const schedaRes = await api.get('/scheda');
@@ -196,8 +192,16 @@ function Banca({ user, onClose }) {
         } catch (error) { showToaster(error.response?.data?.message || "Errore."); }
     };
 
+    // --- CALCOLO SICURO DELLA DATA ---
     const today = new Date().toISOString().split('T')[0];
-    const hasCollectedToday = accountData.last_salary_collection === today;
+    let hasCollectedToday = false;
+    
+    if (accountData.last_salary_collection) {
+        // Converte in oggetto Date e poi in stringa YYYY-MM-DD
+        const lastCollectionDate = new Date(accountData.last_salary_collection).toISOString().split('T')[0];
+        hasCollectedToday = lastCollectionDate === today;
+    }
+    // ---------------------------------
 
     return (
         <>
@@ -273,9 +277,20 @@ function Banca({ user, onClose }) {
                                     <div style={styles.currentJobBox}>
                                         <p style={{ margin: 0, color: '#888', fontSize:'12px', textTransform:'uppercase', letterSpacing:'1px' }}>ATTUALMENTE IMPIEGATO COME</p>
                                         <h4 style={styles.jobTitle}>{accountData.job}</h4>
-                                        <button style={{...styles.button, backgroundColor: hasCollectedToday ? '#333' : '#28a745', opacity: hasCollectedToday ? 0.5 : 1}} onClick={handleCollectSalary} disabled={hasCollectedToday}>
+                                        
+                                        <button 
+                                            style={{
+                                                ...styles.button, 
+                                                // FIX: Uso 'background' invece di 'backgroundColor' per evitare l'errore
+                                                background: hasCollectedToday ? '#333' : '#28a745', 
+                                                opacity: hasCollectedToday ? 0.5 : 1
+                                            }} 
+                                            onClick={handleCollectSalary} 
+                                            disabled={hasCollectedToday}
+                                        >
                                             {hasCollectedToday ? 'PAGA GIORNALIERA GIÀ RITIRATA' : 'RITIRA STIPENDIO (90 REM)'}
                                         </button>
+                                        
                                     </div>
                                 ) : (
                                     <div>

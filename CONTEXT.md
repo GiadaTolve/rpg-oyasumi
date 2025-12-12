@@ -1,3 +1,7 @@
+## IMPORTANTE PER GEMINI AGENT!
+Non provare a lanciare comandi nel bash, quando hai necessità che sia fatto basta indicarmelo.
+
+
 ### **Oyasumi - Technical Context Summary**
 
 Questo documento riassume l'architettura tecnica, le feature implementate e lo stato attuale del progetto "Oyasumi".
@@ -86,3 +90,48 @@ Lo schema è definito nel file di migrazione `20251114112821_initial_schema.js` 
 *   **`GameLayout.jsx`**: È il componente orchestratore del frontend. La sua logica di gestione degli stati per le finestre modali e le chat è centrale per l'esperienza utente. La struttura a 3 colonne e la gestione del rendering dei componenti figli tramite `Outlet` sono ben definite.
 *   **`ChatWindow.jsx`**: Rappresenta l'implementazione finale della feature di chat, mostrando come i messaggi ricevuti via socket vengono visualizzati e come l'utente interagisce con la singola istanza di chat.
 *   **`Forum.jsx`**: È il punto di ingresso per una delle feature più complesse. La sua esistenza e le rotte associate in `App.jsx` indicano che l'intera infrastruttura del forum è stata implementata e integrata nel layout principale.
+
+# 🚀 CHANGELOG - Update: Housing, Economy & Fixes [12 Dicembre 2025]
+
+## ✨ Nuove Funzionalità
+
+### 🏠 Sistema Abitativo (Housing System)
+* **Mercato Immobiliare:** Aggiunta la sezione "Immobiliare" nel Mercato. Gli utenti possono visualizzare e affittare/acquistare diverse tipologie di abitazioni (dal Container alla Villa).
+* **Gestione Affitti:** Implementato il sistema di pagamento affitto (Manuale) con scadenze a 30 giorni.
+* **Tab Casa (Scheda Personaggio):** Nuova sezione visibile ai proprietari di casa per gestire la propria dimora.
+* **Sistema Ospiti & Chiavi:**
+    * Possibilità di invitare altri giocatori (dare le chiavi).
+    * Possibilità di revocare l'accesso.
+    * Lista "Chiavi Ricevute" per visitare le case degli altri giocatori.
+* **Chat Privata Casa:** Ogni abitazione genera una chat room privata accessibile solo al proprietario, agli ospiti con chiave e allo Staff.
+* **Personalizzazione:** I proprietari possono modificare l'Immagine e la Descrizione della propria casa.
+* **Accesso Admin:** Implementato il tasto "Irruzione" per permettere a MOD/ADMIN di entrare in qualsiasi casa dalla scheda utente.
+
+### 🏦 Economia & Lavoro (Arubaito)
+* **Nuova UI Banca:** Interfaccia rinnovata, fissa (no drag) e responsive.
+* **Sistema Lavori (Arubaito):**
+    * Possibilità di scegliere un lavoro (es. Fioraio, Tecnico Pachinko) dalla Banca.
+    * Sistema di ritiro stipendio giornaliero con cooldown di 24 ore.
+* **Storico Transazioni:** Lista degli ultimi movimenti bancari (bonifici, affitti, stipendi).
+
+### 🛡️ Moderazione & Admin
+* **Shadowban System:** Implementato il blocco server-side per la Chat e il lancio dei Dadi per gli utenti in stato di "Shadowban".
+* **Log Sanzioni:** Aggiunta tabella storica delle sanzioni visibile solo allo Staff nel tab "LOG" della scheda personaggio.
+* **Forum Admin:** Ripristinate le funzioni di amministrazione forum (Pin, Lock, Delete topic).
+
+## 🐛 Bug Fixes & Miglioramenti
+
+* **Scheda Personaggio:**
+    * Risolto crash `isMyProfile` all'apertura.
+    * Corretto il bug che impediva la scrittura nei campi di input (Edit Mode).
+    * Risolto conflitto di chiavi duplicate nelle liste React.
+* **Chat Window:**
+    * Risolto errore 404/500 all'apertura delle chat "Casa" (ora gestisce correttamente ID non numerici).
+    * La chat ora mostra correttamente l'immagine e la descrizione personalizzata della casa invece dei placeholder.
+* **Navigazione:**
+    * Collegato correttamente il bottone "Mercato" nella `LeftSidebar`.
+    * Migliorata la gestione dello stato delle finestre nel `GameLayout`.
+
+## 🗄️ Database (Migrations)
+* Aggiunte tabelle: `housing_types`, `housing_guests`, `user_sanctions`.
+* Aggiornata tabella `utenti`: Aggiunti campi per `job`, `last_salary_collection`, `housing_id`, `house_chat_id`, `house_custom_image`, `house_custom_desc`.
