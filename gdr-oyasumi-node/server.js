@@ -380,37 +380,54 @@ app.post('/api/scheda/aggiorna-stat', verificaToken, async (req, res) => {
     }
 });
 
-// [PUT] AGGIORNA PROFILO (Avatar, Background, Cognome)
-app.put('/api/scheda/profilo', verificaToken, async (req, res) => {
-    // Aggiungiamo 'cognome' alla lista dei dati ricevuti
+// =======================================================
+// [AGGIORNAMENTO PROFILO ROBUSTO] (Gestisce PUT e POST)
+// =======================================================
+
+const gestisciAggiornamentoProfilo = async (req, res) => {
+    console.log("📩 Tentativo aggiornamento profilo per:", req.utente.nome_pg);
+    
+    // Estraiamo i dati. NOTA: Il nome_pg e il permesso NON si cambiano da qui per sicurezza.
     const { avatar, avatar_chat, background, cognome } = req.body;
     const userId = req.utente.id;
 
     try {
+        // Eseguiamo l'aggiornamento
         await db('utenti')
             .where('id_utente', userId)
             .update({ 
                 avatar, 
                 avatar_chat, 
                 background,
-                cognome // Ora salviamo anche il cognome
+                cognome 
             });
 
+        // Recuperiamo la scheda aggiornata per rimandarla al frontend
         const schedaAggiornata = await db('utenti').where('id_utente', userId).first();
+        
         if (schedaAggiornata) {
             delete schedaAggiornata.password;
+            
+            // Ricalcolo livello se necessario
             if (typeof calculateLevel === 'function') {
                 schedaAggiornata.livello = calculateLevel(schedaAggiornata.exp_accumulata);
             }
+            
+            console.log("✅ Profilo aggiornato con successo!");
             res.status(200).json(schedaAggiornata);
         } else {
-            res.status(404).json({ message: "Utente non trovato." });
+            res.status(404).json({ message: "Utente non trovato nel DB." });
         }
+
     } catch (error) {
-        console.error("Errore aggiornamento profilo:", error);
-        res.status(500).json({ message: "Errore interno." });
+        console.error("❌ Errore critico salvataggio profilo:", error);
+        res.status(500).json({ message: "Errore interno durante il salvataggio." });
     }
-});
+};
+
+// Colleghiamo la funzione a ENTRAMBI i metodi per sicurezza
+app.put('/api/scheda/profilo', verificaToken, gestisciAggiornamentoProfilo);
+app.post('/api/scheda/profilo', verificaToken, gestisciAggiornamentoProfilo);
 
 // BANNER
 app.get('/api/active-banner', async (req, res) => {
