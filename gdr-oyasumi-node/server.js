@@ -482,12 +482,38 @@ app.get('/api/weather', verificaToken, async (req, res) => {
 });
 
 // ADMIN ROUTES (Users, Locations, etc.)
-// ... Omesse per brevità le rotte ADMIN CRUD ma la struttura è questa ...
+
 app.get('/api/admin/users', verificaToken, verificaMod, async (req, res) => {
     const users = await db('utenti').select('id_utente', 'email', 'nome_pg', 'permesso');
     res.json(users);
 });
-// ...
+// [PUT] MODIFICA UTENTE DA ADMIN (Nome, Permesso) - ROTTA MANCANTE AGGIUNTA
+app.put('/api/admin/users/:id', verificaToken, verificaAdmin, async (req, res) => {
+    const targetId = req.params.id;
+    const { nome_pg, permesso } = req.body;
+
+    try {
+        const updateData = {};
+        // Aggiorniamo solo se i dati sono presenti
+        if (nome_pg) updateData.nome_pg = nome_pg;
+        if (permesso) updateData.permesso = permesso;
+
+        if (Object.keys(updateData).length === 0) {
+            return res.status(400).json({ message: "Nessun dato da modificare." });
+        }
+
+        await db('utenti')
+            .where('id_utente', targetId)
+            .update(updateData);
+
+        res.json({ message: "Utente aggiornato con successo." });
+
+    } catch (error) {
+        console.error("Errore modifica admin:", error);
+        res.status(500).json({ message: "Errore interno durante la modifica." });
+    }
+});
+
 
 // MAPPE DI GIOCO
 app.get('/api/game/map/:mapId', verificaToken, async (req, res) => {
