@@ -22,6 +22,98 @@ const environment = process.env.NODE_ENV || 'development';
 const db = knex(knexConfig[environment]);
 
 const app = express();
+
+// ==========================================
+// --- SETUP COMPLETO (CASE + FIX UTENTI) ---
+// ==========================================
+app.get('/api/setup-housing', async (req, res) => {
+    try {
+        console.log("🔧 Inizio procedura di riparazione database...");
+
+        // 1. FIX TABELLA UTENTI (Aggiunta colonna data lavoro)
+        if (!(await db.schema.hasColumn('utenti', 'job_started_at'))) {
+            await db.schema.table('utenti', t => t.timestamp('job_started_at').nullable());
+            console.log("✅ Colonna 'job_started_at' aggiunta alla tabella utenti.");
+        }
+
+        // 2. FIX TABELLA HOUSING_TYPES (Struttura)
+        const columnsToCheck = [
+            { name: 'image_url', type: 'string' },
+            { name: 'bonus_hp', type: 'integer', default: 0 },
+            { name: 'bonus_slots', type: 'integer', default: 0 },
+            { name: 'cost_type', type: 'string', default: 'MONTHLY' }
+        ];
+
+        for (const col of columnsToCheck) {
+            if (!(await db.schema.hasColumn('housing_types', col.name))) {
+                await db.schema.table('housing_types', t => {
+                    if (col.type === 'integer') t.integer(col.name).defaultTo(col.default);
+                    else t.string(col.name).defaultTo(col.default);
+                });
+                console.log(`✅ Colonna '${col.name}' aggiunta a housing_types.`);
+            }
+        }
+
+        // 3. INSERIMENTO DATI CASE (Con ID forzati per evitare conflitti)
+        await db.transaction(async (trx) => {
+            // A. Gestione Stanza dell'Ordine (ID 1)
+            const room1 = await trx('housing_types').where('id', 1).first();
+            const room1Data = {
+                name: "Stanza dell'Ordine (10mq)",
+                description: "Alloggio base per le reclute. Essenziale.",
+                cost_rem: 5,
+                cost_type: "DAILY_SALARY",
+                bonus_hp: 0,
+                bonus_slots: 5,
+                image_url: "/housing/room_order.jpg"
+            };
+
+            if (room1) {
+                await trx('housing_types').where('id', 1).update(room1Data);
+            } else {
+                await trx('housing_types').insert({ id: 1, ...room1Data });
+            }
+
+            // B. Pulizia vecchie case (tranne la 1)
+            await trx('housing_types').where('id', '>', 1).del();
+
+            // C. Inserimento nuove case con ID espliciti (2, 3, 4...)
+            // Questo impedisce l'errore "duplicate key value"
+            const nuoveCase = [
+                { id: 2, name: 'Container Cosmicon (25mq)', description: 'Un modulo abitativo nel complesso industriale.', cost_rem: 100, cost_type: 'MONTHLY', bonus_hp: 5, bonus_slots: 10, image_url: '/housing/container.jpg' },
+                { id: 3, name: 'Monolocale Wall Town (35mq)', description: 'Piccolo ma accogliente, nel cuore della città.', cost_rem: 120, cost_type: 'MONTHLY', bonus_hp: 5, bonus_slots: 13, image_url: '/housing/monolocale.jpg' },
+                { id: 4, name: 'Bilocale (45mq)', description: 'Spazio sufficiente per una vita dignitosa.', cost_rem: 150, cost_type: 'MONTHLY', bonus_hp: 5, bonus_slots: 15, image_url: '/housing/bilocale.jpg' },
+                { id: 5, name: 'Cottage (55mq)', description: 'Una casa indipendente con un piccolo giardino.', cost_rem: 250, cost_type: 'MONTHLY', bonus_hp: 10, bonus_slots: 15, image_url: '/housing/cottage.jpg' },
+                { id: 6, name: 'Appartamento Borghese (70mq)', description: 'Rifiniture di pregio per chi ha fatto carriera.', cost_rem: 280, cost_type: 'MONTHLY', bonus_hp: 10, bonus_slots: 18, image_url: '/housing/borghese.jpg' },
+                { id: 7, name: 'Villa (85mq)', description: 'Il lusso. Ampi spazi e sicurezza garantita.', cost_rem: 300, cost_type: 'MONTHLY', bonus_hp: 10, bonus_slots: 20, image_url: '/housing/villa.jpg' },
+                { id: 8, name: 'Proprietà Paradise (Esclusiva)', description: 'Solo per possessori di Pass Paradise. Il massimo.', cost_rem: 400, cost_type: 'MONTHLY', bonus_hp: 15, bonus_slots: 25, image_url: '/housing/paradise.jpg' }
+            ];
+
+            // Inseriamo una per una o in blocco (forzare l'ID richiede attenzione in alcuni DB, ma con knex insert standard va bene)
+            for (const casa of nuoveCase) {
+                await trx('housing_types').insert(casa);
+            }
+        });
+
+        res.send(`
+            <div style="font-family: sans-serif; padding: 20px; background: #1a1a20; color: #4ade80;">
+                <h1>✅ Riparazione Completata!</h1>
+                <ul>
+                    <li>Tabella Utenti: Colonna 'job_started_at' verificata.</li>
+                    <li>Tabella Case: Colonne mancanti aggiunte.</li>
+                    <li>Listino: 8 Case inserite correttamente (ID 1-8).</li>
+                </ul>
+                <p>Ora puoi rimuovere questo codice da server.js e riavviare.</p>
+            </div>
+        `);
+
+    } catch (error) {
+        console.error("❌ ERRORE SETUP:", error);
+        res.status(500).send(`<h1 style="color:red">Errore Critico</h1><pre>${error.message}</pre>`);
+    }
+});
+
+
 const port = process.env.PORT || 3000;
 const httpServer = http.createServer(app);
 
@@ -1563,95 +1655,6 @@ io.on('connection', async (socket) => {
 });
 
 
-// ==========================================
-// --- SETUP COMPLETO (CASE + FIX UTENTI) ---
-// ==========================================
-app.get('/api/setup-housing', async (req, res) => {
-    try {
-        console.log("🔧 Inizio procedura di riparazione database...");
-
-        // 1. FIX TABELLA UTENTI (Aggiunta colonna data lavoro)
-        if (!(await db.schema.hasColumn('utenti', 'job_started_at'))) {
-            await db.schema.table('utenti', t => t.timestamp('job_started_at').nullable());
-            console.log("✅ Colonna 'job_started_at' aggiunta alla tabella utenti.");
-        }
-
-        // 2. FIX TABELLA HOUSING_TYPES (Struttura)
-        const columnsToCheck = [
-            { name: 'image_url', type: 'string' },
-            { name: 'bonus_hp', type: 'integer', default: 0 },
-            { name: 'bonus_slots', type: 'integer', default: 0 },
-            { name: 'cost_type', type: 'string', default: 'MONTHLY' }
-        ];
-
-        for (const col of columnsToCheck) {
-            if (!(await db.schema.hasColumn('housing_types', col.name))) {
-                await db.schema.table('housing_types', t => {
-                    if (col.type === 'integer') t.integer(col.name).defaultTo(col.default);
-                    else t.string(col.name).defaultTo(col.default);
-                });
-                console.log(`✅ Colonna '${col.name}' aggiunta a housing_types.`);
-            }
-        }
-
-        // 3. INSERIMENTO DATI CASE (Con ID forzati per evitare conflitti)
-        await db.transaction(async (trx) => {
-            // A. Gestione Stanza dell'Ordine (ID 1)
-            const room1 = await trx('housing_types').where('id', 1).first();
-            const room1Data = {
-                name: "Stanza dell'Ordine (10mq)",
-                description: "Alloggio base per le reclute. Essenziale.",
-                cost_rem: 5,
-                cost_type: "DAILY_SALARY",
-                bonus_hp: 0,
-                bonus_slots: 5,
-                image_url: "/housing/room_order.jpg"
-            };
-
-            if (room1) {
-                await trx('housing_types').where('id', 1).update(room1Data);
-            } else {
-                await trx('housing_types').insert({ id: 1, ...room1Data });
-            }
-
-            // B. Pulizia vecchie case (tranne la 1)
-            await trx('housing_types').where('id', '>', 1).del();
-
-            // C. Inserimento nuove case con ID espliciti (2, 3, 4...)
-            // Questo impedisce l'errore "duplicate key value"
-            const nuoveCase = [
-                { id: 2, name: 'Container Cosmicon (25mq)', description: 'Un modulo abitativo nel complesso industriale.', cost_rem: 100, cost_type: 'MONTHLY', bonus_hp: 5, bonus_slots: 10, image_url: '/housing/container.jpg' },
-                { id: 3, name: 'Monolocale Wall Town (35mq)', description: 'Piccolo ma accogliente, nel cuore della città.', cost_rem: 120, cost_type: 'MONTHLY', bonus_hp: 5, bonus_slots: 13, image_url: '/housing/monolocale.jpg' },
-                { id: 4, name: 'Bilocale (45mq)', description: 'Spazio sufficiente per una vita dignitosa.', cost_rem: 150, cost_type: 'MONTHLY', bonus_hp: 5, bonus_slots: 15, image_url: '/housing/bilocale.jpg' },
-                { id: 5, name: 'Cottage (55mq)', description: 'Una casa indipendente con un piccolo giardino.', cost_rem: 250, cost_type: 'MONTHLY', bonus_hp: 10, bonus_slots: 15, image_url: '/housing/cottage.jpg' },
-                { id: 6, name: 'Appartamento Borghese (70mq)', description: 'Rifiniture di pregio per chi ha fatto carriera.', cost_rem: 280, cost_type: 'MONTHLY', bonus_hp: 10, bonus_slots: 18, image_url: '/housing/borghese.jpg' },
-                { id: 7, name: 'Villa (85mq)', description: 'Il lusso. Ampi spazi e sicurezza garantita.', cost_rem: 300, cost_type: 'MONTHLY', bonus_hp: 10, bonus_slots: 20, image_url: '/housing/villa.jpg' },
-                { id: 8, name: 'Proprietà Paradise (Esclusiva)', description: 'Solo per possessori di Pass Paradise. Il massimo.', cost_rem: 400, cost_type: 'MONTHLY', bonus_hp: 15, bonus_slots: 25, image_url: '/housing/paradise.jpg' }
-            ];
-
-            // Inseriamo una per una o in blocco (forzare l'ID richiede attenzione in alcuni DB, ma con knex insert standard va bene)
-            for (const casa of nuoveCase) {
-                await trx('housing_types').insert(casa);
-            }
-        });
-
-        res.send(`
-            <div style="font-family: sans-serif; padding: 20px; background: #1a1a20; color: #4ade80;">
-                <h1>✅ Riparazione Completata!</h1>
-                <ul>
-                    <li>Tabella Utenti: Colonna 'job_started_at' verificata.</li>
-                    <li>Tabella Case: Colonne mancanti aggiunte.</li>
-                    <li>Listino: 8 Case inserite correttamente (ID 1-8).</li>
-                </ul>
-                <p>Ora puoi rimuovere questo codice da server.js e riavviare.</p>
-            </div>
-        `);
-
-    } catch (error) {
-        console.error("❌ ERRORE SETUP:", error);
-        res.status(500).send(`<h1 style="color:red">Errore Critico</h1><pre>${error.message}</pre>`);
-    }
-});
 
 // --- 5. AVVIO SERVER ---
 (async () => {
