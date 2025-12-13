@@ -20,9 +20,31 @@ require('dotenv').config();
 const environment = process.env.NODE_ENV || 'development';
 // Inizializza il database usando Knex e il file di configurazione
 const db = knex(knexConfig[environment]);
-
 const app = express();
 
+// ==========================================
+// 🚑 PRONTO SOCCORSO: SFRATTO FORZATO DA ELIMINARE
+// ==========================================
+app.get('/api/emergency-evict', async (req, res) => {
+    try {
+        // Resettiamo la casa per l'utente ID 1 (Aramis)
+        // Se il tuo utente non è l'ID 1, cambia il numero qui sotto!
+        await db('utenti').where('id_utente', 1).update({
+            housing_id: null,
+            house_chat_id: null,
+            rent_due_date: null,
+            house_custom_image: null,
+            house_custom_desc: null
+        });
+
+        // Cancelliamo anche eventuali ospiti/chiavi vecchie
+        await db('housing_guests').where('owner_id', 1).del();
+
+        res.send("<h1>🚑 Sfratto Eseguito!</h1><p>Il contratto di Aramis è stato stracciato. Ora il database è pulito e puoi affittare di nuovo.</p>");
+    } catch (e) {
+        res.status(500).send("Errore: " + e.message);
+    }
+});
 
 const port = process.env.PORT || 3000;
 const httpServer = http.createServer(app);
@@ -101,7 +123,6 @@ const checkRentDue = async (userId) => {
         console.error("Errore controllo affitti:", e);
     }
 };
-
 
 // --- 2. MIDDLEWARE ---
 app.use(cors(corsOptions));

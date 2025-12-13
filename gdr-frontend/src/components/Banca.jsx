@@ -120,6 +120,18 @@ const styles = {
         fontFamily: "'Cinzel', serif", fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px',
         boxShadow: '0 0 10px rgba(162, 112, 255, 0.3)', transition: 'all 0.2s'
     },
+    // NUOVO STILE: Bottone Pericolo (Rosso)
+    dangerButton: {
+        padding: '8px 20px', 
+        background: 'rgba(255, 42, 42, 0.1)', 
+        border: '1px solid #ff2a2a',
+        color: '#ff4444', borderRadius: '4px', cursor: 'pointer',
+        fontFamily: "'Cinzel', serif", fontWeight: 'bold', textTransform: 'uppercase', fontSize: '11px',
+        marginTop: '15px', transition: 'all 0.2s'
+    },
+    disabledButton: {
+        opacity: 0.5, cursor: 'not-allowed', filter: 'grayscale(100%)'
+    },
 
     // TOASTER
     toaster: {
@@ -146,7 +158,7 @@ const Toaster = ({ message, onHide }) => {
 
 function Banca({ user, onClose }) {
     const [activeTab, setActiveTab] = useState('conto');
-    const [accountData, setAccountData] = useState({ rem: 0, job: null, last_salary_collection: null });
+    const [accountData, setAccountData] = useState({ rem: 0, job: null, last_salary_collection: null, job_started_at: null });
     const [history, setHistory] = useState([]);
     const [transferData, setTransferData] = useState({ receiverName: '', amount: '', reason: '' });
     
@@ -180,6 +192,18 @@ function Banca({ user, onClose }) {
             showToaster(response.data.message); fetchAccountData(); 
         } catch (error) { showToaster(error.response?.data?.message || "Errore."); } 
     };
+
+    // --- NUOVA FUNZIONE: LASCIA LAVORO ---
+    const handleLeaveJob = async () => {
+        if(!confirm("Sei sicuro di voler rassegnare le dimissioni?")) return;
+        try {
+            const response = await api.post('/bank/leave-job');
+            showToaster(response.data.message);
+            fetchAccountData();
+        } catch (error) {
+            showToaster(error.response?.data?.message || "Impossibile lasciare il lavoro.");
+        }
+    };
     
     const handleTransferChange = (e) => setTransferData({ ...transferData, [e.target.name]: e.target.value });
     const handleTransferSubmit = async (e) => {
@@ -192,16 +216,33 @@ function Banca({ user, onClose }) {
         } catch (error) { showToaster(error.response?.data?.message || "Errore."); }
     };
 
-    // --- CALCOLO SICURO DELLA DATA ---
+    // --- CALCOLI DATA ---
     const today = new Date().toISOString().split('T')[0];
     let hasCollectedToday = false;
-    
     if (accountData.last_salary_collection) {
-        // Converte in oggetto Date e poi in stringa YYYY-MM-DD
         const lastCollectionDate = new Date(accountData.last_salary_collection).toISOString().split('T')[0];
         hasCollectedToday = lastCollectionDate === today;
     }
-    // ---------------------------------
+
+    // --- CALCOLO GIORNI DI LAVORO (Cooldown 10 gg) ---
+    let daysWorked = 0;
+    let canLeaveJob = true;
+    let leaveMessage = "";
+
+    if (accountData.job_started_at) {
+        const start = new Date(accountData.job_started_at);
+        const now = new Date();
+        const diffTime = Math.abs(now - start);
+        daysWorked = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+        
+        if (daysWorked < 10) {
+            canLeaveJob = false;
+            leaveMessage = ` (Vincolo attivo: ancora ${10 - daysWorked} giorni)`;
+        }
+    } else {
+        // Se non c'è una data (vecchi lavori), permettiamo di lasciare subito per evitare blocchi
+        canLeaveJob = true;
+    }
 
     return (
         <>
@@ -220,31 +261,32 @@ function Banca({ user, onClose }) {
                     
                     <main style={styles.main}>
                         {/* TAB CONTO */}
-                        {activeTab === 'conto' && ( 
-                            <div> 
-                                <div style={styles.balanceContainer}>
-                                    <div style={styles.balanceLabel}>SALDO DISPONIBILE</div>
-                                    <div style={styles.balance}>{accountData.rem} REM</div> 
-                                </div>
-                                <h3 style={{color: '#a270ff', borderBottom: '1px solid rgba(162, 112, 255, 0.3)', paddingBottom: '10px', fontFamily: "'Cinzel', serif"}}>STORICO MOVIMENTI</h3> 
-                                <div> 
-                                    {history.length > 0 ? history.map(tx => ( 
-                                        <div key={tx.id} style={styles.historyItem}> 
-                                            <div> 
-                                                <p style={{margin: '0 0 2px 0', color: '#e6e0ff', fontWeight:'bold'}}>{tx.reason}</p> 
-                                                <p style={{margin: 0, fontSize: '11px', color: '#888'}}> 
-                                                    {tx.sender_id === user.id ? `A: ${tx.receiver_name}` : `Da: ${tx.sender_name || 'Sistema'}`} • {new Date(tx.timestamp).toLocaleDateString()}
-                                                </p> 
-                                            </div> 
-                                            <div style={tx.receiver_id === user.id ? styles.amountIn : styles.amountOut}> 
-                                                {tx.receiver_id === user.id ? '+' : '-'}{tx.amount} 
-                                            </div> 
-                                        </div> 
-                                    )) : <div style={{textAlign:'center', padding:'20px', color:'#666'}}>Nessun movimento recente.</div>} 
-                                </div> 
-                            </div> 
-                        )}
-
+{/* TAB CONTO */}
+{activeTab === 'conto' && ( 
+    <div> 
+        <div style={styles.balanceContainer}>
+            <div style={styles.balanceLabel}>SALDO DISPONIBILE</div>
+            <div style={styles.balance}>{accountData.rem} REM</div> 
+        </div>
+        <h3 style={{color: '#a270ff', borderBottom: '1px solid rgba(162, 112, 255, 0.3)', paddingBottom: '10px', fontFamily: "'Cinzel', serif"}}>STORICO MOVIMENTI</h3> 
+        <div> 
+            {history.length > 0 ? history.map((tx, index) => ( // <--- AGGIUNTO index QUI
+                // MODIFICATO key: Usa tx.id se esiste, altrimenti usa index
+                <div key={tx.id || index} style={styles.historyItem}> 
+                    <div> 
+                        <p style={{margin: '0 0 2px 0', color: '#e6e0ff', fontWeight:'bold'}}>{tx.reason}</p> 
+                        <p style={{margin: 0, fontSize: '11px', color: '#888'}}> 
+                            {tx.sender_id === user.id ? `A: ${tx.receiver_name}` : `Da: ${tx.sender_name || 'Sistema'}`} • {new Date(tx.timestamp).toLocaleDateString()}
+                        </p> 
+                    </div> 
+                    <div style={tx.receiver_id === user.id ? styles.amountIn : styles.amountOut}> 
+                        {tx.receiver_id === user.id ? '+' : '-'}{tx.amount} 
+                    </div> 
+                </div> 
+            )) : <div style={{textAlign:'center', padding:'20px', color:'#666'}}>Nessun movimento recente.</div>} 
+        </div> 
+    </div> 
+)}
                         {/* TAB OPERAZIONI */}
                         {activeTab === 'operazioni' && ( 
                             <div> 
@@ -278,18 +320,33 @@ function Banca({ user, onClose }) {
                                         <p style={{ margin: 0, color: '#888', fontSize:'12px', textTransform:'uppercase', letterSpacing:'1px' }}>ATTUALMENTE IMPIEGATO COME</p>
                                         <h4 style={styles.jobTitle}>{accountData.job}</h4>
                                         
-                                        <button 
-                                            style={{
-                                                ...styles.button, 
-                                                // FIX: Uso 'background' invece di 'backgroundColor' per evitare l'errore
-                                                background: hasCollectedToday ? '#333' : '#28a745', 
-                                                opacity: hasCollectedToday ? 0.5 : 1
-                                            }} 
-                                            onClick={handleCollectSalary} 
-                                            disabled={hasCollectedToday}
-                                        >
-                                            {hasCollectedToday ? 'PAGA GIORNALIERA GIÀ RITIRATA' : 'RITIRA STIPENDIO (90 REM)'}
-                                        </button>
+                                        <div style={{display:'flex', gap:'10px', justifyContent:'center'}}>
+                                            {/* Bottone Stipendio */}
+                                            <button 
+                                                style={{
+                                                    ...styles.button, 
+                                                    background: hasCollectedToday ? '#333' : '#28a745', 
+                                                    opacity: hasCollectedToday ? 0.5 : 1
+                                                }} 
+                                                onClick={handleCollectSalary} 
+                                                disabled={hasCollectedToday}
+                                            >
+                                                {hasCollectedToday ? 'STIPENDIO RITIRATO' : 'RITIRA (90 REM)'}
+                                            </button>
+
+                                            {/* Bottone Lascia Lavoro */}
+                                            <button
+                                                style={{
+                                                    ...styles.dangerButton,
+                                                    ...( !canLeaveJob ? styles.disabledButton : {} )
+                                                }}
+                                                onClick={() => canLeaveJob && handleLeaveJob()}
+                                                disabled={!canLeaveJob}
+                                                title={!canLeaveJob ? "Devi attendere 10 giorni dall'assunzione" : "Lascia il lavoro attuale"}
+                                            >
+                                                LASCIA IMPIEGO {leaveMessage}
+                                            </button>
+                                        </div>
                                         
                                     </div>
                                 ) : (

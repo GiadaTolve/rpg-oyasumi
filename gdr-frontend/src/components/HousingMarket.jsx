@@ -10,7 +10,8 @@ import {
     faCity,
     faCheckCircle,
     faDoorOpen,
-    faBan
+    faBan,
+    faSpinner // Aggiunta icona caricamento
 } from '@fortawesome/free-solid-svg-icons';
 
 const THEME = {
@@ -56,7 +57,6 @@ const styles = {
       fontSize: '13px',
       fontStyle: 'italic'
   },
-  // --- NUOVO STILE PER IL PANNELLO LASCIA CASA ---
   leavePanel: {
     background: 'rgba(20, 0, 0, 0.6)',
     border: `1px solid ${THEME.colors.danger}`,
@@ -85,7 +85,6 @@ const styles = {
       gap: '10px',
       alignItems: 'center'
   },
-  // ----------------------------------------------
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
@@ -177,7 +176,6 @@ const styles = {
     cursor: 'not-allowed',
     border: '1px solid #333'
   },
-  // Stile speciale per il bottone "Contratto Firmato"
   btnOwned: {
       marginTop: '10px',
       padding: '12px',
@@ -195,22 +193,32 @@ const styles = {
   }
 };
 
-function HousingMarket({ user, onPurchaseSuccess }) {
+function HousingMarket({ user: initialUser, onPurchaseSuccess }) {
     const [houses, setHouses] = useState([]);
     const [loading, setLoading] = useState(true);
+    // [FIX] Usiamo uno stato locale per l'utente per poterlo aggiornare indipendentemente dal padre
+    const [currentUser, setCurrentUser] = useState(initialUser);
 
     useEffect(() => {
-        const fetchData = async () => {
+        const fetchAllData = async () => {
             try {
+                setLoading(true);
+                // 1. Scarica lista case
                 const resMarket = await api.get('/housing/market');
                 setHouses(resMarket.data);
+
+                // 2. [FIX] Scarica la scheda aggiornata dell'utente
+                // Questo recupera l'housing_id aggiornato anche se Mercato.jsx ha dati vecchi
+                const resUser = await api.get('/scheda');
+                setCurrentUser(resUser.data);
+
             } catch (error) {
-                console.error("Errore caricamento case:", error);
+                console.error("Errore caricamento dati mercato:", error);
             } finally {
                 setLoading(false);
             }
         };
-        fetchData();
+        fetchAllData();
     }, []);
 
     const handleRent = async (house) => {
@@ -219,31 +227,36 @@ function HousingMarket({ user, onPurchaseSuccess }) {
         try {
             const res = await api.post('/housing/rent', { houseId: house.id });
             alert(res.data.message);
-            // Ricarichiamo la pagina per aggiornare lo stato utente (soldi e casa posseduta)
-            window.location.reload(); 
+            
+            // [FIX] Aggiorna subito i dati locali per vedere l'effetto immediato
+            const resUser = await api.get('/scheda');
+            setCurrentUser(resUser.data);
+            
+            if (onPurchaseSuccess) onPurchaseSuccess(); 
         } catch (error) {
             alert("Errore affitto: " + (error.response?.data?.message || "Errore sconosciuto"));
         }
     };
 
-    // --- NUOVA FUNZIONE PER LASCIARE CASA ---
     const handleLeaveHouse = async () => {
         if(!confirm("ATTENZIONE: Sei sicuro di voler lasciare la tua abitazione?\nPerderai l'accesso alla chat privata e le personalizzazioni.")) return;
 
         try {
             const res = await api.post('/housing/leave');
             alert(res.data.message);
-            // Ricarichiamo la pagina per aggiornare lo stato (l'utente non avrà più casa)
-            window.location.reload();
+            
+            // [FIX] Aggiorna subito i dati locali
+            const resUser = await api.get('/scheda');
+            setCurrentUser(resUser.data);
         } catch (error) {
             alert("Errore: " + (error.response?.data?.message || "Impossibile lasciare la casa."));
         }
     };
 
-    if (loading) return <div style={{padding:'20px', color:'#fff', textAlign:'center'}}><FontAwesomeIcon icon={faCity} spin /> Caricamento listino...</div>;
+    if (loading) return <div style={{padding:'20px', color:'#fff', textAlign:'center'}}><FontAwesomeIcon icon={faSpinner} spin /> Caricamento listino...</div>;
 
-    // Verifica se l'utente ha una casa (controlliamo se housing_id ha un valore valido)
-    const hasHouse = !!user.housing_id; 
+    // [FIX] Usiamo currentUser invece di user
+    const hasHouse = !!currentUser.housing_id; 
 
     return (
         <div style={styles.container}>
@@ -255,7 +268,7 @@ function HousingMarket({ user, onPurchaseSuccess }) {
                 "Un tetto sicuro è il primo passo verso il potere. Scegli con saggezza."
             </p>
 
-            {/* --- PANNELLO LASCIA IMMOBILE (Visibile solo se hai una casa) --- */}
+            {/* BOX LASCIA IMMOBILE (Visibile se currentUser ha una casa) */}
             {hasHouse && (
                 <div style={styles.leavePanel}>
                     <div style={styles.leaveText}>
@@ -271,30 +284,26 @@ function HousingMarket({ user, onPurchaseSuccess }) {
 
             <div style={styles.grid}>
                 {houses.map(house => {
-                    const canAfford = user.rem >= house.cost_rem;
+                    const canAfford = currentUser.rem >= house.cost_rem;
                     const isSalary = house.cost_type === 'DAILY_SALARY';
                     
-                    // Controllo se è QUESTA la casa che possiedo
-                    const isMyHouse = user.housing_id === house.id;
+                    // [FIX] Usa == per sicurezza sui tipi (string vs int)
+                    const isMyHouse = currentUser.housing_id == house.id;
                     
-                    // Determiniamo lo stato del bottone
                     let buttonLabel = "";
                     let isDisabled = false;
                     let isOwnedStyle = false;
 
                     if (isMyHouse) {
-                        // CASO 1: È casa mia
                         buttonLabel = isSalary ? "ASSEGNATO" : "CONTRATTO FIRMATO";
                         isOwnedStyle = true;
                         isDisabled = true;
                     } else if (hasHouse) {
-                        // CASO 2: Ho già una casa (ma non è questa) -> Non posso comprare
                         buttonLabel = "NON DISPONIBILE";
                         isDisabled = true;
                     } else {
-                        // CASO 3: Non ho case -> Posso comprare (se ho soldi)
                         buttonLabel = isSalary ? "ASSEGNAZIONE" : "FIRMA CONTRATTO";
-                        isDisabled = !canAfford && !isSalary; // Disabilita solo se mancano soldi
+                        isDisabled = !canAfford && !isSalary;
                     }
                     
                     return (
@@ -310,7 +319,7 @@ function HousingMarket({ user, onPurchaseSuccess }) {
                                         {house.cost_rem} <FontAwesomeIcon icon={faCoins} style={{fontSize:'10px'}} />
                                     </span>
                                     <span style={styles.costLabel}>
-                                        {isSalary ? 'DETRAZIONE STIPENDIO' : 'CANONE MENSILE'}
+                                        {isSalary ? 'DETRAZIONE' : 'MENSILE'}
                                     </span>
                                 </div>
                             </div>
@@ -328,7 +337,6 @@ function HousingMarket({ user, onPurchaseSuccess }) {
                                 </div>
                             </div>
 
-                            {/* LOGICA RENDER BOTTONE */}
                             {isOwnedStyle ? (
                                 <div style={styles.btnOwned}>
                                     <FontAwesomeIcon icon={faCheckCircle} />
