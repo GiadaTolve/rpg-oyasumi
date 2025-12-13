@@ -176,6 +176,75 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
+// ==========================================
+// 📦 SETUP OGGETTI & INVENTARIO (Rotta Temporanea)
+// ==========================================
+app.get('/api/setup-items', async (req, res) => {
+    try {
+        console.log("📦 Inizio setup inventario...");
+
+        // 1. CREAZIONE TABELLA 'oggetti' (se manca)
+        if (!(await db.schema.hasTable('oggetti'))) {
+            await db.schema.createTable('oggetti', (table) => {
+                table.increments('id').primary();
+                table.string('nome').notNullable();
+                table.string('descrizione');
+                table.string('icona'); // Es: /icone/pozione.png
+                table.string('tipo').defaultTo('GENERICO');
+                table.float('peso').defaultTo(0);
+            });
+            console.log("✅ Tabella 'oggetti' creata.");
+        }
+
+        // 2. CREAZIONE TABELLA 'inventario' (se manca)
+        if (!(await db.schema.hasTable('inventario'))) {
+            await db.schema.createTable('inventario', (table) => {
+                table.increments('id').primary();
+                table.integer('user_id').unsigned().references('id_utente').inTable('utenti').onDelete('CASCADE');
+                table.integer('item_id').unsigned().references('id').inTable('oggetti').onDelete('CASCADE');
+                table.integer('quantita').defaultTo(1);
+            });
+            console.log("✅ Tabella 'inventario' creata.");
+        }
+
+        await db.transaction(async (trx) => {
+            // 3. POPOLIAMO GLI OGGETTI (Upsert manuale)
+            const oggettiBase = [
+                { id: 1, nome: 'Pozione Curativa', descrizione: 'Restituisce 10 PF', icona: 'https://i.imgur.com/Xq7tX1h.png', tipo: 'CONSUMABILE' },
+                { id: 2, nome: 'Katana Arrugginita', descrizione: 'Vecchia lama.', icona: 'https://i.imgur.com/2b3m4zL.png', tipo: 'ARMA' },
+                { id: 3, nome: 'Chiave Dorata', descrizione: 'Apre qualcosa...', icona: 'https://i.imgur.com/8QzXy9A.png', tipo: 'CHIAVE' }
+            ];
+
+            for (const obj of oggettiBase) {
+                // Controlla se esiste, se no lo crea
+                const exists = await trx('oggetti').where('id', obj.id).first();
+                if (!exists) {
+                    await trx('oggetti').insert(obj);
+                }
+            }
+
+            // 4. ASSEGNA OGGETTI AL PRIMO UTENTE (Probabilmente TU)
+            // Cerchiamo il primo utente nel DB
+            const primoUtente = await trx('utenti').orderBy('id_utente', 'asc').first();
+            
+            if (primoUtente) {
+                // Diamo 5 Pozioni
+                const invExists = await trx('inventario').where({ user_id: primoUtente.id_utente, item_id: 1 }).first();
+                if (!invExists) {
+                    await trx('inventario').insert({ user_id: primoUtente.id_utente, item_id: 1, quantita: 5 });
+                    console.log(`🎁 Assegnate 5 Pozioni a ${primoUtente.nome_pg}`);
+                }
+            }
+        });
+
+        res.send("<h1>📦 Oggetti e Inventario Configurati!</h1><p>Tabelle create e oggetti di test assegnati al primo utente.</p>");
+
+    } catch (error) {
+        console.error("❌ ERRORE SETUP ITEMS:", error);
+        res.status(500).send("Errore: " + error.message);
+    }
+});
+
 // AUTH: LOGIN
 app.post('/api/login', async (req, res) => {
     try {
