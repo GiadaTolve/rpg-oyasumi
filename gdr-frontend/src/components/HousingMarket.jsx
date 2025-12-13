@@ -8,7 +8,9 @@ import {
     faFileSignature, 
     faCoins, 
     faCity,
-    faCheckCircle 
+    faCheckCircle,
+    faDoorOpen,
+    faBan
 } from '@fortawesome/free-solid-svg-icons';
 
 const THEME = {
@@ -54,6 +56,36 @@ const styles = {
       fontSize: '13px',
       fontStyle: 'italic'
   },
+  // --- NUOVO STILE PER IL PANNELLO LASCIA CASA ---
+  leavePanel: {
+    background: 'rgba(20, 0, 0, 0.6)',
+    border: `1px solid ${THEME.colors.danger}`,
+    borderRadius: '4px',
+    padding: '15px',
+    marginBottom: '30px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    boxShadow: '0 0 15px rgba(255, 0, 0, 0.1)'
+  },
+  leaveText: {
+      fontSize: '14px',
+      color: '#ffcccc'
+  },
+  btnLeave: {
+      padding: '10px 20px',
+      background: THEME.colors.danger,
+      color: '#fff',
+      border: 'none',
+      borderRadius: '2px',
+      cursor: 'pointer',
+      fontFamily: THEME.fonts.title,
+      fontWeight: 'bold',
+      display: 'flex',
+      gap: '10px',
+      alignItems: 'center'
+  },
+  // ----------------------------------------------
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
@@ -140,25 +172,26 @@ const styles = {
     gap: '10px'
   },
   btnRentDisabled: {
-    background: '#333',
-    color: '#666',
+    background: '#222',
+    color: '#555',
     cursor: 'not-allowed',
-    border: '1px solid #444'
+    border: '1px solid #333'
   },
-  currentBadge: {
-    textAlign: 'center',
-    background: 'rgba(74, 222, 128, 0.1)',
-    border: `1px solid ${THEME.colors.success}`,
-    color: THEME.colors.success,
-    padding: '10px',
-    borderRadius: '2px',
-    fontWeight: 'bold',
-    fontSize: '12px',
-    marginTop: '10px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '8px'
+  // Stile speciale per il bottone "Contratto Firmato"
+  btnOwned: {
+      marginTop: '10px',
+      padding: '12px',
+      background: 'rgba(74, 222, 128, 0.1)',
+      border: `1px solid ${THEME.colors.success}`,
+      color: THEME.colors.success,
+      fontFamily: THEME.fonts.title,
+      fontSize: '13px',
+      fontWeight: 'bold',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '8px',
+      cursor: 'default'
   }
 };
 
@@ -186,13 +219,31 @@ function HousingMarket({ user, onPurchaseSuccess }) {
         try {
             const res = await api.post('/housing/rent', { houseId: house.id });
             alert(res.data.message);
-            if (onPurchaseSuccess) onPurchaseSuccess(); 
+            // Ricarichiamo la pagina per aggiornare lo stato utente (soldi e casa posseduta)
+            window.location.reload(); 
         } catch (error) {
             alert("Errore affitto: " + (error.response?.data?.message || "Errore sconosciuto"));
         }
     };
 
+    // --- NUOVA FUNZIONE PER LASCIARE CASA ---
+    const handleLeaveHouse = async () => {
+        if(!confirm("ATTENZIONE: Sei sicuro di voler lasciare la tua abitazione?\nPerderai l'accesso alla chat privata e le personalizzazioni.")) return;
+
+        try {
+            const res = await api.post('/housing/leave');
+            alert(res.data.message);
+            // Ricarichiamo la pagina per aggiornare lo stato (l'utente non avrà più casa)
+            window.location.reload();
+        } catch (error) {
+            alert("Errore: " + (error.response?.data?.message || "Impossibile lasciare la casa."));
+        }
+    };
+
     if (loading) return <div style={{padding:'20px', color:'#fff', textAlign:'center'}}><FontAwesomeIcon icon={faCity} spin /> Caricamento listino...</div>;
+
+    // Verifica se l'utente ha una casa (controlliamo se housing_id ha un valore valido)
+    const hasHouse = !!user.housing_id; 
 
     return (
         <div style={styles.container}>
@@ -204,17 +255,53 @@ function HousingMarket({ user, onPurchaseSuccess }) {
                 "Un tetto sicuro è il primo passo verso il potere. Scegli con saggezza."
             </p>
 
+            {/* --- PANNELLO LASCIA IMMOBILE (Visibile solo se hai una casa) --- */}
+            {hasHouse && (
+                <div style={styles.leavePanel}>
+                    <div style={styles.leaveText}>
+                        <strong>Proprietà Attiva:</strong> Risiedi attualmente in una struttura.<br/>
+                        Per cambiare abitazione, devi prima rescindere il contratto attuale.
+                    </div>
+                    <button style={styles.btnLeave} onClick={handleLeaveHouse}>
+                        <FontAwesomeIcon icon={faDoorOpen} />
+                        LASCIA IMMOBILE
+                    </button>
+                </div>
+            )}
+
             <div style={styles.grid}>
                 {houses.map(house => {
                     const canAfford = user.rem >= house.cost_rem;
                     const isSalary = house.cost_type === 'DAILY_SALARY';
-                    const isCurrent = user.housing_id === house.id;
+                    
+                    // Controllo se è QUESTA la casa che possiedo
+                    const isMyHouse = user.housing_id === house.id;
+                    
+                    // Determiniamo lo stato del bottone
+                    let buttonLabel = "";
+                    let isDisabled = false;
+                    let isOwnedStyle = false;
+
+                    if (isMyHouse) {
+                        // CASO 1: È casa mia
+                        buttonLabel = isSalary ? "ASSEGNATO" : "CONTRATTO FIRMATO";
+                        isOwnedStyle = true;
+                        isDisabled = true;
+                    } else if (hasHouse) {
+                        // CASO 2: Ho già una casa (ma non è questa) -> Non posso comprare
+                        buttonLabel = "NON DISPONIBILE";
+                        isDisabled = true;
+                    } else {
+                        // CASO 3: Non ho case -> Posso comprare (se ho soldi)
+                        buttonLabel = isSalary ? "ASSEGNAZIONE" : "FIRMA CONTRATTO";
+                        isDisabled = !canAfford && !isSalary; // Disabilita solo se mancano soldi
+                    }
                     
                     return (
                         <div key={house.id} style={{
                             ...styles.card,
-                            borderColor: isCurrent ? THEME.colors.success : THEME.colors.border,
-                            boxShadow: isCurrent ? `0 0 15px ${THEME.colors.success}40` : 'none'
+                            borderColor: isMyHouse ? THEME.colors.success : THEME.colors.border,
+                            boxShadow: isMyHouse ? `0 0 15px ${THEME.colors.success}40` : 'none'
                         }}>
                             <div style={styles.cardHeader}>
                                 <h3 style={styles.houseName}>{house.name}</h3>
@@ -241,23 +328,23 @@ function HousingMarket({ user, onPurchaseSuccess }) {
                                 </div>
                             </div>
 
-                            {/* LOGICA BOTTONE */}
-                            {isCurrent ? (
-                                <div style={styles.currentBadge}>
+                            {/* LOGICA RENDER BOTTONE */}
+                            {isOwnedStyle ? (
+                                <div style={styles.btnOwned}>
                                     <FontAwesomeIcon icon={faCheckCircle} />
-                                    RESIDENZA ATTUALE
+                                    {buttonLabel}
                                 </div>
                             ) : (
                                 <button 
                                     style={{
                                         ...styles.btnRent, 
-                                        ...( (!canAfford && !isSalary) ? styles.btnRentDisabled : {}) 
+                                        ...( isDisabled ? styles.btnRentDisabled : {}) 
                                     }}
-                                    onClick={() => handleRent(house)}
-                                    disabled={!canAfford && !isSalary}
+                                    onClick={() => !isDisabled && handleRent(house)}
+                                    disabled={isDisabled}
                                 >
-                                    <FontAwesomeIcon icon={faFileSignature} />
-                                    {isSalary ? "ASSEGNAZIONE" : "FIRMA CONTRATTO"}
+                                    <FontAwesomeIcon icon={isDisabled ? faBan : faFileSignature} />
+                                    {buttonLabel}
                                 </button>
                             )}
                         </div>

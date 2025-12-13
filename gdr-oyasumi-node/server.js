@@ -864,6 +864,40 @@ app.get('/api/housing/guest-access', verificaToken, async (req, res) => {
     } catch (e) { res.status(500).json({ message: "Errore recupero chiavi." }); }
 });
 
+// [NUOVO] 9. LASCIA ABITAZIONE (Rescindi contratto)
+app.post('/api/housing/leave', verificaToken, async (req, res) => {
+    const userId = req.utente.id;
+
+    try {
+        const user = await db('utenti').where('id_utente', userId).first();
+
+        // Verifica se l'utente ha effettivamente una casa
+        if (!user.housing_id) {
+            return res.status(400).json({ message: "Non possiedi alcuna abitazione da lasciare." });
+        }
+
+        await db.transaction(async (trx) => {
+            // 1. Rimuovi i dati abitazione dall'utente
+            await trx('utenti').where('id_utente', userId).update({
+                housing_id: null,      // Rimuove il riferimento al tipo di casa
+                house_chat_id: null,   // Rimuove l'id della chat
+                rent_due_date: null,   // Rimuove la scadenza affitto
+                house_custom_image: null, // (Opzionale) Reset immagine personalizzata
+                house_custom_desc: null   // (Opzionale) Reset descrizione personalizzata
+            });
+
+            // 2. Rimuovi eventuali ospiti che avevano le chiavi di questa casa
+            await trx('housing_guests').where('owner_id', userId).del();
+        });
+
+        res.json({ message: "Hai rescisso il contratto e lasciato l'abitazione." });
+
+    } catch (error) {
+        console.error("Errore lascia immobile:", error);
+        res.status(500).json({ message: "Errore interno del server." });
+    }
+});
+
 app.put('/api/housing/customize', verificaToken, async (req, res) => {
     const { customImage, customDesc } = req.body;
     try {
@@ -1053,7 +1087,7 @@ app.get('/api/bank/job', verificaToken, async (req, res) => {
 // 4. RITIRA STIPENDIO
 app.post('/api/bank/collect-salary', verificaToken, async (req, res) => {
     const userId = req.utente.id;
-    const SALARY_AMOUNT = 50; // O calcolato in base al lavoro/livello
+    const SALARY_AMOUNT = 90; // O calcolato in base al lavoro/livello
     const COOLDOWN_HOURS = 24;
 
     try {
