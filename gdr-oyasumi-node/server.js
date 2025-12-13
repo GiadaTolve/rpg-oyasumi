@@ -1653,7 +1653,6 @@ app.get('/api/setup-housing', async (req, res) => {
     }
 });
 
-
 // --- 5. AVVIO SERVER ---
 (async () => {
     try {
