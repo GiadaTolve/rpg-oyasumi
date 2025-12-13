@@ -22,30 +22,6 @@ const environment = process.env.NODE_ENV || 'development';
 const db = knex(knexConfig[environment]);
 const app = express();
 
-// ==========================================
-// 🚑 PRONTO SOCCORSO: SFRATTO FORZATO DA ELIMINARE
-// ==========================================
-app.get('/api/emergency-evict', async (req, res) => {
-    try {
-        // Resettiamo la casa per l'utente ID 1 (Aramis)
-        // Se il tuo utente non è l'ID 1, cambia il numero qui sotto!
-        await db('utenti').where('id_utente', 1).update({
-            housing_id: null,
-            house_chat_id: null,
-            rent_due_date: null,
-            house_custom_image: null,
-            house_custom_desc: null
-        });
-
-        // Cancelliamo anche eventuali ospiti/chiavi vecchie
-        await db('housing_guests').where('owner_id', 1).del();
-
-        res.send("<h1>🚑 Sfratto Eseguito!</h1><p>Il contratto di Aramis è stato stracciato. Ora il database è pulito e puoi affittare di nuovo.</p>");
-    } catch (e) {
-        res.status(500).send("Errore: " + e.message);
-    }
-});
-
 const port = process.env.PORT || 3000;
 const httpServer = http.createServer(app);
 
@@ -198,7 +174,7 @@ app.post('/api/register', async (req, res) => {
 });
 
 // ==========================================
-// 📦 SETUP OGGETTI & INVENTARIO (Rotta Temporanea)
+// 📦 SETUP OGGETTI & INVENTARIO (Rotta Temporanea) DA ELIMINARE! SOLO TEST
 // ==========================================
 app.get('/api/setup-items', async (req, res) => {
     try {
@@ -1614,12 +1590,36 @@ io.on('connection', async (socket) => {
         console.log(`✅ Utente AUTENTICATO connesso: ${userProfile.nome_pg}`);
         onlineUsers[socket.id] = userProfile;
         userSockets.set(userProfile.id, socket.id); 
-        io.emit('update_online_list', Object.values(onlineUsers));
         
+        // --- 1. FIX LISTA GLOBALE (Rimuovi duplicati) ---
+        const getUniqueGlobalUsers = () => {
+            const uniqueMap = new Map();
+            Object.values(onlineUsers).forEach(u => {
+                if (u && u.id) uniqueMap.set(u.id, u);
+            });
+            return Array.from(uniqueMap.values());
+        };
+        io.emit('update_online_list', getUniqueGlobalUsers());
+        
+        // --- 2. FIX LISTA STANZA (Rimuovi duplicati) ---
         const updateRoomUsers = async (chatId) => {
             const socketsInRoom = await io.in(chatId).fetchSockets();
-            const usersInRoom = socketsInRoom.map(s => onlineUsers[s.id]);
-            io.to(chatId).emit('room_users_update', usersInRoom);
+            
+            // Mappiamo i socket agli utenti
+            const rawUsers = socketsInRoom.map(s => onlineUsers[s.id]).filter(u => u);
+            
+            // Usiamo una Map per tenere solo un utente per ogni ID
+            const uniqueUsersMap = new Map();
+            rawUsers.forEach(user => {
+                if (!uniqueUsersMap.has(user.id)) {
+                    uniqueUsersMap.set(user.id, user);
+                }
+            });
+            
+            // Convertiamo la Map in Array
+            const uniqueUsers = Array.from(uniqueUsersMap.values());
+            
+            io.to(chatId).emit('room_users_update', uniqueUsers);
         };
 
         socket.on('join_chat', (chatId) => { socket.join(chatId); updateRoomUsers(chatId); });
@@ -1793,9 +1793,17 @@ io.on('connection', async (socket) => {
         socket.on('disconnect', () => {
             if (userProfile && userProfile.nome_pg) {
                 console.log(`❌ Disconnesso: ${userProfile.nome_pg}`);
-                userSockets.delete(userProfile.id);
+                // Nota: Non cancelliamo da userSockets se ha altre schede aperte, 
+                // ma per ora va bene così, il problema visivo è la priorità.
                 delete onlineUsers[socket.id];
-                io.emit('update_online_list', Object.values(onlineUsers));
+                
+                // Usiamo la stessa logica di deduplicazione di prima
+                const uniqueMap = new Map();
+                Object.values(onlineUsers).forEach(u => {
+                    if (u && u.id) uniqueMap.set(u.id, u);
+                });
+                
+                io.emit('update_online_list', Array.from(uniqueMap.values()));
             }
         });
 

@@ -36,11 +36,11 @@ const styles = {
     width: '260px', flexShrink: 0, padding: '20px', 
     borderRight: '1px solid rgba(255,255,255,0.05)', 
     display: 'flex', flexDirection: 'column', 
-    backgroundColor: 'rgba(0, 0, 0, 0.3)', overflowY: 'auto' 
+    backgroundColor: 'rgba(0, 0, 0, 0.3)', overflowY: 'auto', overflowX: 'hidden' 
   },
   rightColumn: { flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: 'transparent' },
   messages: { 
-    flexGrow: 1, padding: '20px 40px', overflowY: 'auto', 
+    flexGrow: 1, padding: '20px 40px', overflowY: 'auto', overflowX: 'hidden',
     backgroundImage: "url('/backgrounds/darkstone.png')", backgroundRepeat: 'repeat', backgroundBlendMode: 'overlay', backgroundColor: 'rgba(0,0,0,0.6)',
     scrollbarWidth: 'thin', scrollbarColor: '#c9a84a transparent'
   },
@@ -294,7 +294,7 @@ function ChatWindow({ chat, onClose, user }) {
                                       </div>
                                   </div>
                                   <button style={styles.stealBtn} onClick={() => handleStealItem(item.inv_id)}>
-                                      PRENDI
+                                      RUBA
                                   </button>
                               </div>
                           ))
@@ -328,7 +328,7 @@ function ChatWindow({ chat, onClose, user }) {
           {/* BOTTONE ARMADIO (Solo se è una casa) */}
           {isHouseChat && (
               <button style={styles.toolButton} onClick={handleOpenHouseInventory}>
-                  <span>📦 ARMADIO / SCAFFALI</span>
+                  <span>📦 ARMADIO</span>
               </button>
           )}
 
