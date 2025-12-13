@@ -23,96 +23,6 @@ const db = knex(knexConfig[environment]);
 
 const app = express();
 
-// ==========================================
-// --- SETUP COMPLETO (CASE + FIX UTENTI) ---
-// ==========================================
-app.get('/api/setup-housing', async (req, res) => {
-    try {
-        console.log("🔧 Inizio procedura di riparazione database...");
-
-        // 1. FIX TABELLA UTENTI (Aggiunta colonna data lavoro)
-        if (!(await db.schema.hasColumn('utenti', 'job_started_at'))) {
-            await db.schema.table('utenti', t => t.timestamp('job_started_at').nullable());
-            console.log("✅ Colonna 'job_started_at' aggiunta alla tabella utenti.");
-        }
-
-        // 2. FIX TABELLA HOUSING_TYPES (Struttura)
-        const columnsToCheck = [
-            { name: 'image_url', type: 'string' },
-            { name: 'bonus_hp', type: 'integer', default: 0 },
-            { name: 'bonus_slots', type: 'integer', default: 0 },
-            { name: 'cost_type', type: 'string', default: 'MONTHLY' }
-        ];
-
-        for (const col of columnsToCheck) {
-            if (!(await db.schema.hasColumn('housing_types', col.name))) {
-                await db.schema.table('housing_types', t => {
-                    if (col.type === 'integer') t.integer(col.name).defaultTo(col.default);
-                    else t.string(col.name).defaultTo(col.default);
-                });
-                console.log(`✅ Colonna '${col.name}' aggiunta a housing_types.`);
-            }
-        }
-
-        // 3. INSERIMENTO DATI CASE (Con ID forzati per evitare conflitti)
-        await db.transaction(async (trx) => {
-            // A. Gestione Stanza dell'Ordine (ID 1)
-            const room1 = await trx('housing_types').where('id', 1).first();
-            const room1Data = {
-                name: "Stanza dell'Ordine (10mq)",
-                description: "Alloggio base per le reclute. Essenziale.",
-                cost_rem: 5,
-                cost_type: "DAILY_SALARY",
-                bonus_hp: 0,
-                bonus_slots: 5,
-                image_url: "/housing/room_order.jpg"
-            };
-
-            if (room1) {
-                await trx('housing_types').where('id', 1).update(room1Data);
-            } else {
-                await trx('housing_types').insert({ id: 1, ...room1Data });
-            }
-
-            // B. Pulizia vecchie case (tranne la 1)
-            await trx('housing_types').where('id', '>', 1).del();
-
-            // C. Inserimento nuove case con ID espliciti (2, 3, 4...)
-            // Questo impedisce l'errore "duplicate key value"
-            const nuoveCase = [
-                { id: 2, name: 'Container Cosmicon (25mq)', description: 'Un modulo abitativo nel complesso industriale.', cost_rem: 100, cost_type: 'MONTHLY', bonus_hp: 5, bonus_slots: 10, image_url: '/housing/container.jpg' },
-                { id: 3, name: 'Monolocale Wall Town (35mq)', description: 'Piccolo ma accogliente, nel cuore della città.', cost_rem: 120, cost_type: 'MONTHLY', bonus_hp: 5, bonus_slots: 13, image_url: '/housing/monolocale.jpg' },
-                { id: 4, name: 'Bilocale (45mq)', description: 'Spazio sufficiente per una vita dignitosa.', cost_rem: 150, cost_type: 'MONTHLY', bonus_hp: 5, bonus_slots: 15, image_url: '/housing/bilocale.jpg' },
-                { id: 5, name: 'Cottage (55mq)', description: 'Una casa indipendente con un piccolo giardino.', cost_rem: 250, cost_type: 'MONTHLY', bonus_hp: 10, bonus_slots: 15, image_url: '/housing/cottage.jpg' },
-                { id: 6, name: 'Appartamento Borghese (70mq)', description: 'Rifiniture di pregio per chi ha fatto carriera.', cost_rem: 280, cost_type: 'MONTHLY', bonus_hp: 10, bonus_slots: 18, image_url: '/housing/borghese.jpg' },
-                { id: 7, name: 'Villa (85mq)', description: 'Il lusso. Ampi spazi e sicurezza garantita.', cost_rem: 300, cost_type: 'MONTHLY', bonus_hp: 10, bonus_slots: 20, image_url: '/housing/villa.jpg' },
-                { id: 8, name: 'Proprietà Paradise (Esclusiva)', description: 'Solo per possessori di Pass Paradise. Il massimo.', cost_rem: 400, cost_type: 'MONTHLY', bonus_hp: 15, bonus_slots: 25, image_url: '/housing/paradise.jpg' }
-            ];
-
-            // Inseriamo una per una o in blocco (forzare l'ID richiede attenzione in alcuni DB, ma con knex insert standard va bene)
-            for (const casa of nuoveCase) {
-                await trx('housing_types').insert(casa);
-            }
-        });
-
-        res.send(`
-            <div style="font-family: sans-serif; padding: 20px; background: #1a1a20; color: #4ade80;">
-                <h1>✅ Riparazione Completata!</h1>
-                <ul>
-                    <li>Tabella Utenti: Colonna 'job_started_at' verificata.</li>
-                    <li>Tabella Case: Colonne mancanti aggiunte.</li>
-                    <li>Listino: 8 Case inserite correttamente (ID 1-8).</li>
-                </ul>
-                <p>Ora puoi rimuovere questo codice da server.js e riavviare.</p>
-            </div>
-        `);
-
-    } catch (error) {
-        console.error("❌ ERRORE SETUP:", error);
-        res.status(500).send(`<h1 style="color:red">Errore Critico</h1><pre>${error.message}</pre>`);
-    }
-});
-
 
 const port = process.env.PORT || 3000;
 const httpServer = http.createServer(app);
@@ -146,6 +56,52 @@ function calculateLevel(exp) {
   const level = Math.floor((-5 + Math.sqrt(225 + 4 * exp)) / 10);
   return Math.min(level, 50);
 }
+
+// --- FUNZIONE DI SERVIZIO: CONTROLLO AFFITTI ---
+const checkRentDue = async (userId) => {
+    try {
+        const user = await db('utenti')
+            .join('housing_types', 'utenti.housing_id', 'housing_types.id')
+            .select('utenti.id_utente', 'utenti.rent_due_date', 'housing_types.cost_rem', 'housing_types.cost_type', 'housing_types.name')
+            .where('utenti.id_utente', userId)
+            .first();
+
+        // Se non ha casa o paga giornalmente (Ordine), ignoriamo
+        if (!user || !user.rent_due_date || user.cost_type === 'DAILY_SALARY') return;
+
+        const now = new Date();
+        const dueDate = new Date(user.rent_due_date);
+
+        // Se la data di scadenza è passata...
+        if (now > dueDate) {
+            // Controlliamo se abbiamo già mandato un avviso oggi per evitare spam
+            // Cerchiamo messaggi mandati dal SISTEMA (ID 0) nelle ultime 24 ore
+            const lastMsg = await db('private_messages')
+                .where({ receiver_id: userId, sender_id: 0 }) 
+                .andWhere('text', 'like', '%AFFITTO SCADUTO%')
+                .orderBy('timestamp', 'desc')
+                .first();
+            
+            // Se non c'è messaggio recente, inviamo il sollecito
+            if (!lastMsg || (new Date() - new Date(lastMsg.timestamp) > 86400000)) {
+                
+                const msgTesto = `⚠️ AFFITTO SCADUTO ⚠️\nGentile inquilino, il canone per "${user.name}" di ${user.cost_rem} REM è scaduto.\nEffettua il pagamento tramite il pannello Banca o verrai sfrattato.`;
+
+                await db('private_messages').insert({
+                    sender_id: 0, // 0 = ID fittizio per NPC/Sistema
+                    receiver_id: userId,
+                    text: msgTesto,
+                    is_read: 0
+                });
+                
+                console.log(`[HOUSING] Inviato sollecito affitto a User ${userId}`);
+            }
+        }
+    } catch (e) {
+        console.error("Errore controllo affitti:", e);
+    }
+};
+
 
 // --- 2. MIDDLEWARE ---
 app.use(cors(corsOptions));
@@ -236,6 +192,7 @@ app.post('/api/login', async (req, res) => {
         const payload = { id: utente.id_utente, nome_pg: utente.nome_pg, permesso: utente.permesso };
         const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1d' });
 
+        checkRentDue(utente.id_utente);
         res.status(200).json({ message: 'Login effettuato con successo!', token });
     } catch (errore) {
         console.error('Errore nel login:', errore);
@@ -1046,6 +1003,110 @@ app.get('/api/housing/chat/:chatId', verificaToken, async (req, res) => {
     }
 });
 
+// 10. [HOUSING] GUARDA NEGLI ARMADI (Vedi inventario casa)
+app.get('/api/housing/house-inventory/:chatId', verificaToken, async (req, res) => {
+    const { chatId } = req.params;
+    const userId = req.utente.id;
+
+    try {
+        // 1. Identifica la casa dalla chat
+        const houseOwner = await db('utenti').where('house_chat_id', chatId).first();
+        if (!houseOwner) return res.status(404).json({ message: "Questa non è una casa." });
+
+        // 2. Controllo Permessi (Proprietario, Ospite o Admin)
+        const isOwner = houseOwner.id_utente === userId;
+        const isAdmin = ['ADMIN', 'MOD'].includes(req.utente.permesso);
+        let isGuest = false;
+
+        if (!isOwner && !isAdmin) {
+            const guestRecord = await db('housing_guests')
+                .where({ housing_id: houseOwner.housing_id, guest_id: userId })
+                .first();
+            if (guestRecord) isGuest = true;
+        }
+
+        if (!isOwner && !isGuest && !isAdmin) {
+            return res.status(403).json({ message: "Non hai le chiavi per frugare qui." });
+        }
+
+        // 3. Recupera inventario del proprietario
+        // NOTA: Assumiamo che la tua tabella oggetti si chiami 'oggetti' e l'inventario 'inventario'
+        // Se i nomi sono diversi nel tuo DB, correggi qui sotto!
+        const items = await db('inventario')
+            .join('oggetti', 'inventario.item_id', 'oggetti.id') 
+            .select('inventario.id as inv_id', 'oggetti.nome', 'oggetti.icona', 'inventario.quantita')
+            .where('inventario.user_id', houseOwner.id_utente);
+
+        res.json({ ownerName: houseOwner.nome_pg, items, isOwner });
+
+    } catch (e) {
+        console.error("Errore inventario casa:", e);
+        // Restituiamo lista vuota in caso di errore (es. tabella inventario mancante) per non bloccare
+        res.json({ ownerName: "Sconosciuto", items: [] }); 
+    }
+});
+
+// 11. [HOUSING] RUBA OGGETTO
+app.post('/api/housing/steal', verificaToken, async (req, res) => {
+    const { invItemId, targetChatId } = req.body; 
+    const thiefId = req.utente.id;
+
+    try {
+        await db.transaction(async (trx) => {
+            // Verifica casa e proprietario
+            const houseOwner = await trx('utenti').where('house_chat_id', targetChatId).first();
+            if (!houseOwner) throw new Error("Casa non trovata.");
+
+            if (houseOwner.id_utente === thiefId) throw new Error("Non puoi rubare a te stesso!");
+
+            // Verifica oggetto
+            const itemToSteal = await trx('inventario').where('id', invItemId).first();
+            if (!itemToSteal || itemToSteal.user_id !== houseOwner.id_utente) {
+                throw new Error("L'oggetto non è più qui.");
+            }
+
+            // --- ESECUZIONE FURTO (Sposta 1 unità) ---
+            
+            // 1. Rimuovi da Vittima
+            if (itemToSteal.quantita > 1) {
+                await trx('inventario').where('id', invItemId).decrement('quantita', 1);
+            } else {
+                await trx('inventario').where('id', invItemId).del();
+            }
+
+            // 2. Aggiungi a Ladro
+            const existingItem = await trx('inventario')
+                .where({ user_id: thiefId, item_id: itemToSteal.item_id })
+                .first();
+
+            if (existingItem) {
+                await trx('inventario').where('id', existingItem.id).increment('quantita', 1);
+            } else {
+                await trx('inventario').insert({
+                    user_id: thiefId,
+                    item_id: itemToSteal.item_id,
+                    quantita: 1
+                });
+            }
+
+            // 3. Notifica in Chat (Il brivido del rischio!)
+            // Usiamo il socket se possibile, altrimenti salviamo nel log
+            const thiefName = req.utente.nome_pg;
+            await trx('chat_log').insert({
+                chat_id: targetChatId,
+                autore: 'SISTEMA',
+                testo: `⚠️ RUMORI SOSPETTI: Qualcuno sta frugando tra gli oggetti di ${houseOwner.nome_pg}!`,
+                tipo: 'azione' 
+            });
+        });
+
+        res.json({ message: "Hai rubato l'oggetto! Scappa!" });
+
+    } catch (e) {
+        console.error("Errore furto:", e);
+        res.status(500).json({ message: e.message || "Errore durante il furto." });
+    }
+});
 
 // =================================================================
 // --- GESTIONE AVANZATA FORUM (ADMIN/MOD) ---
