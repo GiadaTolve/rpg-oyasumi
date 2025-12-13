@@ -1053,6 +1053,7 @@ app.get('/api/bank/history', verificaToken, async (req, res) => {
             .join('utenti as sender', 'transactions.sender_id', 'sender.id_utente')
             .leftJoin('utenti as receiver', 'transactions.receiver_id', 'receiver.id_utente')
             .select(
+                'transactions.id', // <--- AGGIUNGI QUESTO!
                 'transactions.amount',
                 'transactions.reason',
                 'transactions.timestamp',
@@ -1062,7 +1063,7 @@ app.get('/api/bank/history', verificaToken, async (req, res) => {
             .where('transactions.sender_id', req.utente.id)
             .orWhere('transactions.receiver_id', req.utente.id)
             .orderBy('transactions.timestamp', 'desc')
-            .limit(50);
+            .limit(5);
 
         res.json(history);
     } catch (error) {
@@ -1087,13 +1088,23 @@ app.get('/api/bank/job', verificaToken, async (req, res) => {
 // 4. RITIRA STIPENDIO
 app.post('/api/bank/collect-salary', verificaToken, async (req, res) => {
     const userId = req.utente.id;
-    const SALARY_AMOUNT = 90; // O calcolato in base al lavoro/livello
+    const BASE_SALARY = 90; // O calcolato in base al lavoro
     const COOLDOWN_HOURS = 24;
 
     try {
-        const user = await db('utenti').where('id_utente', userId).first();
+        // Recuperiamo utente E info sulla casa (costo e tipo pagamento)
+        const user = await db('utenti')
+            .leftJoin('housing_types', 'utenti.housing_id', 'housing_types.id')
+            .select(
+                'utenti.*', 
+                'housing_types.cost_rem as house_cost', 
+                'housing_types.cost_type as house_payment_type',
+                'housing_types.name as house_name'
+            )
+            .where('utenti.id_utente', userId)
+            .first();
         
-        // Verifica tempo
+        // 1. Controllo Cooldown (come prima)
         if (user.last_salary_collection) {
             const lastCollection = new Date(user.last_salary_collection);
             const now = new Date();
@@ -1104,22 +1115,41 @@ app.post('/api/bank/collect-salary', verificaToken, async (req, res) => {
             }
         }
 
-        // Paga
+        // 2. Calcolo Stipendio Netto
+        let finalAmount = BASE_SALARY;
+        let rentDeduction = 0;
+        let logReason = "Stipendio Giornaliero";
+
+        // Se ha una casa E il tipo di pagamento è DAILY_SALARY (Detrazione Stipendio)
+        if (user.housing_id && user.house_payment_type === 'DAILY_SALARY') {
+            rentDeduction = user.house_cost || 0;
+            finalAmount = BASE_SALARY - rentDeduction;
+            logReason = `Stipendio (Netto: ${BASE_SALARY} - ${rentDeduction} Affitto)`;
+        }
+
+        // Se l'affitto è più alto dello stipendio (non dovrebbe succedere, ma per sicurezza)
+        if (finalAmount < 0) finalAmount = 0;
+
+        // 3. Eseguiamo la Transazione
         await db.transaction(async (trx) => {
             await trx('utenti').where('id_utente', userId).update({
-                rem: user.rem + SALARY_AMOUNT,
+                rem: user.rem + finalAmount,
                 last_salary_collection: new Date()
             });
             
             await trx('transactions').insert({
-                sender_id: null, // Null = Sistema
+                sender_id: null, // Sistema
                 receiver_id: userId,
-                amount: SALARY_AMOUNT,
-                reason: "Stipendio Giornaliero"
+                amount: finalAmount,
+                reason: logReason
             });
         });
 
-        res.json({ message: `Hai ritirato ${SALARY_AMOUNT} REM!` });
+        if (rentDeduction > 0) {
+            res.json({ message: `Hai ritirato ${finalAmount} REM (Dedotti ${rentDeduction} per l'affitto di ${user.house_name})!` });
+        } else {
+            res.json({ message: `Hai ritirato ${finalAmount} REM!` });
+        }
 
     } catch (error) {
         console.error("Errore stipendio:", error);
@@ -1127,7 +1157,7 @@ app.post('/api/bank/collect-salary', verificaToken, async (req, res) => {
     }
 });
 
-// 5. IMPOSTA LAVORO (Arubaito)
+// MODIFICA: 5. IMPOSTA LAVORO 
 app.post('/api/bank/set-job', verificaToken, async (req, res) => {
     const { jobName } = req.body;
     const userId = req.utente.id;
@@ -1135,24 +1165,58 @@ app.post('/api/bank/set-job', verificaToken, async (req, res) => {
     if (!jobName) return res.status(400).json({ message: "Devi selezionare un lavoro." });
 
     try {
-        // 1. Controlliamo se l'utente ha già un lavoro
         const user = await db('utenti').where('id_utente', userId).first();
-        
-        if (user.job) {
-            return res.status(400).json({ message: "Hai già un impiego! Non puoi cambiarlo." });
-        }
+        if (user.job) return res.status(400).json({ message: "Hai già un impiego!" });
 
-        // 2. Aggiorniamo il database
         await db('utenti').where('id_utente', userId).update({
             job: jobName,
-            last_salary_collection: null // Reset data stipendio (può ritirarlo subito o domani, a tua scelta)
+            last_salary_collection: null,
+            // job_started_at: new Date()  <--- COMMENTA O RIMUOVI QUESTA RIGA SE NON HAI AGGIORNATO IL DB
         });
 
         res.json({ message: `Congratulazioni! Ora lavori come ${jobName}.` });
+    } catch (error) {
+        console.error("ERRORE SET-JOB:", error); // <--- Questo ti dirà l'errore esatto nel terminale
+        res.status(500).json({ message: "Errore server." });
+    }
+});
+
+// [NUOVO] 6. LASCIA LAVORO (Con controllo 10 giorni)
+app.post('/api/bank/leave-job', verificaToken, async (req, res) => {
+    const userId = req.utente.id;
+    const MIN_DAYS = 10;
+
+    try {
+        const user = await db('utenti').where('id_utente', userId).first();
+
+        if (!user.job) return res.status(400).json({ message: "Non hai un lavoro da lasciare." });
+
+        // Controllo Cooldown
+        if (user.job_started_at) {
+            const startDate = new Date(user.job_started_at);
+            const now = new Date();
+            const diffTime = Math.abs(now - startDate);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+
+            if (diffDays < MIN_DAYS) {
+                return res.status(400).json({ 
+                    message: `Devi mantenere il lavoro per almeno ${MIN_DAYS} giorni. (Mancano ${MIN_DAYS - diffDays} gg)` 
+                });
+            }
+        }
+
+        // Procedi alle dimissioni
+        await db('utenti').where('id_utente', userId).update({
+            job: null,
+            last_salary_collection: null,
+            job_started_at: null
+        });
+
+        res.json({ message: "Hai rassegnato le dimissioni." });
 
     } catch (error) {
-        console.error("Errore salvataggio lavoro:", error);
-        res.status(500).json({ message: "Errore interno del server." });
+        console.error("Errore leave job:", error);
+        res.status(500).json({ message: "Errore interno." });
     }
 });
 
@@ -1497,6 +1561,98 @@ io.on('connection', async (socket) => {
         socket.disconnect();
     }
 });
+
+
+// ==========================================
+// --- SETUP COMPLETO (CASE + FIX UTENTI) ---
+// ==========================================
+app.get('/api/setup-housing', async (req, res) => {
+    try {
+        console.log("🔧 Inizio procedura di riparazione database...");
+
+        // 1. FIX TABELLA UTENTI (Aggiunta colonna data lavoro)
+        if (!(await db.schema.hasColumn('utenti', 'job_started_at'))) {
+            await db.schema.table('utenti', t => t.timestamp('job_started_at').nullable());
+            console.log("✅ Colonna 'job_started_at' aggiunta alla tabella utenti.");
+        }
+
+        // 2. FIX TABELLA HOUSING_TYPES (Struttura)
+        const columnsToCheck = [
+            { name: 'image_url', type: 'string' },
+            { name: 'bonus_hp', type: 'integer', default: 0 },
+            { name: 'bonus_slots', type: 'integer', default: 0 },
+            { name: 'cost_type', type: 'string', default: 'MONTHLY' }
+        ];
+
+        for (const col of columnsToCheck) {
+            if (!(await db.schema.hasColumn('housing_types', col.name))) {
+                await db.schema.table('housing_types', t => {
+                    if (col.type === 'integer') t.integer(col.name).defaultTo(col.default);
+                    else t.string(col.name).defaultTo(col.default);
+                });
+                console.log(`✅ Colonna '${col.name}' aggiunta a housing_types.`);
+            }
+        }
+
+        // 3. INSERIMENTO DATI CASE (Con ID forzati per evitare conflitti)
+        await db.transaction(async (trx) => {
+            // A. Gestione Stanza dell'Ordine (ID 1)
+            const room1 = await trx('housing_types').where('id', 1).first();
+            const room1Data = {
+                name: "Stanza dell'Ordine (10mq)",
+                description: "Alloggio base per le reclute. Essenziale.",
+                cost_rem: 5,
+                cost_type: "DAILY_SALARY",
+                bonus_hp: 0,
+                bonus_slots: 5,
+                image_url: "/housing/room_order.jpg"
+            };
+
+            if (room1) {
+                await trx('housing_types').where('id', 1).update(room1Data);
+            } else {
+                await trx('housing_types').insert({ id: 1, ...room1Data });
+            }
+
+            // B. Pulizia vecchie case (tranne la 1)
+            await trx('housing_types').where('id', '>', 1).del();
+
+            // C. Inserimento nuove case con ID espliciti (2, 3, 4...)
+            // Questo impedisce l'errore "duplicate key value"
+            const nuoveCase = [
+                { id: 2, name: 'Container Cosmicon (25mq)', description: 'Un modulo abitativo nel complesso industriale.', cost_rem: 100, cost_type: 'MONTHLY', bonus_hp: 5, bonus_slots: 10, image_url: '/housing/container.jpg' },
+                { id: 3, name: 'Monolocale Wall Town (35mq)', description: 'Piccolo ma accogliente, nel cuore della città.', cost_rem: 120, cost_type: 'MONTHLY', bonus_hp: 5, bonus_slots: 13, image_url: '/housing/monolocale.jpg' },
+                { id: 4, name: 'Bilocale (45mq)', description: 'Spazio sufficiente per una vita dignitosa.', cost_rem: 150, cost_type: 'MONTHLY', bonus_hp: 5, bonus_slots: 15, image_url: '/housing/bilocale.jpg' },
+                { id: 5, name: 'Cottage (55mq)', description: 'Una casa indipendente con un piccolo giardino.', cost_rem: 250, cost_type: 'MONTHLY', bonus_hp: 10, bonus_slots: 15, image_url: '/housing/cottage.jpg' },
+                { id: 6, name: 'Appartamento Borghese (70mq)', description: 'Rifiniture di pregio per chi ha fatto carriera.', cost_rem: 280, cost_type: 'MONTHLY', bonus_hp: 10, bonus_slots: 18, image_url: '/housing/borghese.jpg' },
+                { id: 7, name: 'Villa (85mq)', description: 'Il lusso. Ampi spazi e sicurezza garantita.', cost_rem: 300, cost_type: 'MONTHLY', bonus_hp: 10, bonus_slots: 20, image_url: '/housing/villa.jpg' },
+                { id: 8, name: 'Proprietà Paradise (Esclusiva)', description: 'Solo per possessori di Pass Paradise. Il massimo.', cost_rem: 400, cost_type: 'MONTHLY', bonus_hp: 15, bonus_slots: 25, image_url: '/housing/paradise.jpg' }
+            ];
+
+            // Inseriamo una per una o in blocco (forzare l'ID richiede attenzione in alcuni DB, ma con knex insert standard va bene)
+            for (const casa of nuoveCase) {
+                await trx('housing_types').insert(casa);
+            }
+        });
+
+        res.send(`
+            <div style="font-family: sans-serif; padding: 20px; background: #1a1a20; color: #4ade80;">
+                <h1>✅ Riparazione Completata!</h1>
+                <ul>
+                    <li>Tabella Utenti: Colonna 'job_started_at' verificata.</li>
+                    <li>Tabella Case: Colonne mancanti aggiunte.</li>
+                    <li>Listino: 8 Case inserite correttamente (ID 1-8).</li>
+                </ul>
+                <p>Ora puoi rimuovere questo codice da server.js e riavviare.</p>
+            </div>
+        `);
+
+    } catch (error) {
+        console.error("❌ ERRORE SETUP:", error);
+        res.status(500).send(`<h1 style="color:red">Errore Critico</h1><pre>${error.message}</pre>`);
+    }
+});
+
 
 // --- 5. AVVIO SERVER ---
 (async () => {
