@@ -172,7 +172,7 @@ const verificaMod = (req, res, next) => {
 
 // --- 3. API ROUTES ---
 
-app.get('/', (req, res) => res.send('Il server è attivo!'));
+app.get('/', (req, res) => res.send('🔴 SERVER AGGIORNATO V2 - SETUP PRONTO'));
 
 // AUTH: REGISTRAZIONE
 app.post('/api/register', async (req, res) => {
