@@ -13,6 +13,7 @@ import Shinigami from './Shinigami';
 import MessagingManager from './MessagingManager';
 import Mercato from './Mercato'; 
 import Dock from './Dock'; 
+import MobileMenu from './MobileMenu'; // <--- IMPORTIAMO IL TUO MENU
 import api from '../api';
 
 // --- ICONE SVG PER IL MOBILE ---
@@ -24,28 +25,24 @@ const Icons = {
     Money: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>,
     Home: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>,
     Logout: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>,
-    Mail: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+    Mail: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>,
+    Settings: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
 };
 
 function GameLayout({ user, onLogout }) {
     const socket = useContext(SocketContext);
     
-    // =========================================================
-    // 1. HOOKS E STATI
-    // =========================================================
-
-    // Responsive & Tab Mobile
+    // --- HOOKS ---
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
     const [activeMobileTab, setActiveMobileTab] = useState('HOME');
 
-    // Dati Gioco
     const [openChats, setOpenChats] = useState([]);
     const [currentMap, setCurrentMap] = useState(null);
     const [currentChildren, setCurrentChildren] = useState([]);
     const [mapId, setMapId] = useState('root');
     const [onlineUsers, setOnlineUsers] = useState([]);
 
-    // Finestre Desktop
+    // Finestre Desktop & Menu Mobile
     const [isSchedaOpen, setIsSchedaOpen] = useState(false);
     const [isBancaOpen, setIsBancaOpen] = useState(false);
     const [isMessagingOpen, setIsMessagingOpen] = useState(false);
@@ -53,21 +50,18 @@ function GameLayout({ user, onLogout }) {
     const [isAmbientazioneOpen, setIsAmbientazioneOpen] = useState(false);
     const [isShinigamiOpen, setIsShinigamiOpen] = useState(false);
     const [isMercatoOpen, setIsMercatoOpen] = useState(false); 
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // <--- STATO PER IL TUO MENU
+    
     const [schedaTargetUser, setSchedaTargetUser] = useState(null);
-
-    // Target per chat privata (da Mobile "Presenti")
     const [targetPrivateUser, setTargetPrivateUser] = useState(null);
 
     // --- EFFECTS ---
-    
-    // Resize Listener
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth <= 1024);
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Socket: Lista Presenti
     useEffect(() => {
         if(socket) {
             const handleUsers = (u) => setOnlineUsers(u);
@@ -76,7 +70,6 @@ function GameLayout({ user, onLogout }) {
         }
     }, [socket]);
 
-    // Fetch Mappa
     useEffect(() => {
         const fetchMapData = async () => {
             try {
@@ -88,10 +81,7 @@ function GameLayout({ user, onLogout }) {
         fetchMapData();
     }, [mapId]);
 
-    // =========================================================
-    // 2. HANDLERS
-    // =========================================================
-
+    // --- HANDLERS ---
     const handleRestoreChat = (chatId) => {
         const chatToRestore = openChats.find(c => c.id === chatId);
         if (!chatToRestore) return;
@@ -100,11 +90,8 @@ function GameLayout({ user, onLogout }) {
 
     const handleZoneClick = (location) => {
         if (location.type === 'CHAT') {
-            if (openChats.find(chat => chat.id === location.id)) {
-                handleRestoreChat(location.id);
-            } else {
-                setOpenChats(prev => [...prev, location]);
-            }
+            if (openChats.find(chat => chat.id === location.id)) handleRestoreChat(location.id);
+            else setOpenChats(prev => [...prev, location]);
         } else if (location.type === 'MAP') {
             setMapId(location.id);
         }
@@ -112,13 +99,10 @@ function GameLayout({ user, onLogout }) {
 
     const handleCloseChat = (chatId) => setOpenChats(openChats.filter(chat => chat.id !== chatId));
     const handleGoBack = () => setMapId(currentMap?.parent_id || 'root');
-    
-    // Toggle Desktop
     const handleToggleScheda = () => setIsSchedaOpen(!isSchedaOpen);
     const handleToggleMercato = () => setIsMercatoOpen(!isMercatoOpen); 
-    const handleOpenPublicScheda = (targetUser) => { setSchedaTargetUser(targetUser); setIsSchedaOpen(true); };
+    const handleOpenPublicScheda = (u) => { setSchedaTargetUser(u); setIsSchedaOpen(true); };
 
-    // Azioni Rapide Mobile
     const handleCollectSalary = async () => {
         try { const res = await api.post('/bank/collect-salary'); alert(res.data.message); } 
         catch (e) { alert(e.response?.data?.message || "Errore stipendio."); }
@@ -128,35 +112,25 @@ function GameLayout({ user, onLogout }) {
         try {
             const res = await api.get('/housing/my-house');
             const houseChat = { id: res.data.house_chat_id, type: 'CHAT', name: res.data.name || 'Casa Mia' };
-            // Su mobile apre la chat full screen, su desktop la aggiunge
-            if (isMobile) {
-                setOpenChats([houseChat]); 
-            } else {
-                handleZoneClick(houseChat);
-            }
+            if (isMobile) setOpenChats([houseChat]); 
+            else handleZoneClick(houseChat);
         } catch (e) { alert("Non hai una casa."); }
     };
 
-    // Apertura Chat Privata da lista (Mobile)
     const handleOpenPrivateChatMobile = (targetUser) => {
         const mappedUser = { id_utente: targetUser.id, nome_pg: targetUser.nome_pg, avatar_chat: targetUser.avatar_chat };
         setTargetPrivateUser(mappedUser);
         setActiveMobileTab('MESSAGGI');
     };
 
-
-    // =========================================================
-    // 3. RENDER CONTENT MOBILE
-    // =========================================================
-    
-    // Stili Mobile
-    const mobileContainerStyle = { padding: '20px', paddingBottom: '90px', background: '#050508', minHeight: '100vh', color: '#b3b3c0', fontFamily: "'Inter', sans-serif" };
-    const mobileHeaderStyle = { textAlign: 'center', color: '#c9a84a', fontFamily: "'Cinzel', serif", fontSize: '20px', marginBottom: '25px', borderBottom: '1px solid rgba(201, 168, 74, 0.2)', paddingBottom: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', textTransform: 'uppercase', letterSpacing: '1px' };
+    // --- RENDER MOBILE ---
+    const mobileContainerStyle = { padding: '20px', paddingBottom: '90px', background: '#050508', minHeight: '100%', color: '#b3b3c0', fontFamily: "'Inter', sans-serif" };
+    const mobileHeaderStyle = { textAlign: 'center', color: '#c9a84a', fontFamily: "'Cinzel', serif", fontSize: '20px', marginBottom: '25px', borderBottom: '1px solid rgba(201, 168, 74, 0.2)', paddingBottom: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', textTransform: 'uppercase', letterSpacing: '1px', position: 'relative' };
     const mobileCardStyle = { padding: '15px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', color: '#e6e0ff', borderRadius: '4px', display: 'flex', alignItems: 'center', marginBottom: '10px', transition: 'all 0.2s', cursor: 'pointer' };
     const actionBtnStyle = (color) => ({ padding: '15px', background: `rgba(${color}, 0.1)`, border: `1px solid rgb(${color})`, color: `rgb(${color})`, borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', fontSize: '12px', fontFamily: "'Cinzel', serif", textTransform: 'uppercase' });
+    const settingsBtnStyle = { position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: '#666', cursor: 'pointer' };
 
     const renderMobileContent = () => {
-        // 1. Chat Aperta (Full Screen)
         if (openChats.length > 0) {
             const activeChat = openChats[openChats.length - 1];
             return (
@@ -166,7 +140,6 @@ function GameLayout({ user, onLogout }) {
             );
         }
 
-        // 2. Tabs
         switch (activeMobileTab) {
             case 'MAPPA':
                 return (
@@ -174,19 +147,21 @@ function GameLayout({ user, onLogout }) {
                         <div style={mobileHeaderStyle}><span style={{color:'#a270ff'}}><Icons.Pin /></span> {currentMap?.name || 'Mappa'}</div>
                         {currentMap?.parent_id && <button onClick={handleGoBack} style={{...mobileCardStyle, justifyContent:'center', color:'#fff', background:'#2a2930', marginBottom:'20px'}}><span style={{marginRight:'8px'}}><Icons.Back /></span> INDIETRO</button>}
                         <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
-                            {currentChildren.map(child => (
-                                <div key={child.id} onClick={() => handleZoneClick(child)} style={mobileCardStyle}>
-                                    <span style={{marginRight:'15px', color: child.type === 'CHAT' ? '#a270ff' : '#c9a84a'}}>{child.type === 'CHAT' ? <Icons.Chat /> : <Icons.MapZone />}</span>
-                                    <div><div style={{fontWeight:'bold', fontSize:'15px', color:'#fff'}}>{child.name}</div><div style={{fontSize:'11px', color:'#888', marginTop:'2px'}}>{child.type === 'CHAT' ? 'Entra in Chat' : 'Esplora Zona'}</div></div>
-                                </div>
-                            ))}
+                            {(!currentChildren || currentChildren.length === 0) ? (
+                                <div style={{textAlign:'center', padding:'20px', color:'#666', fontStyle:'italic'}}>Nessuna zona accessibile.</div>
+                            ) : (
+                                currentChildren.map(child => (
+                                    <div key={child.id} onClick={() => handleZoneClick(child)} style={mobileCardStyle}>
+                                        <span style={{marginRight:'15px', color: child.type === 'CHAT' ? '#a270ff' : '#c9a84a'}}>{child.type === 'CHAT' ? <Icons.Chat /> : <Icons.MapZone />}</span>
+                                        <div><div style={{fontWeight:'bold', fontSize:'15px', color:'#fff'}}>{child.name}</div><div style={{fontSize:'11px', color:'#888', marginTop:'2px'}}>{child.type === 'CHAT' ? 'Entra in Chat' : 'Esplora Zona'}</div></div>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
                 );
-
             case 'MESSAGGI':
                 return <MessagingManager isVisible={true} onClose={() => setActiveMobileTab('HOME')} isMobile={true} targetUser={targetPrivateUser} onClearTarget={() => setTargetPrivateUser(null)} />;
-
             case 'PRESENTI':
                 return (
                     <div style={mobileContainerStyle}>
@@ -202,12 +177,16 @@ function GameLayout({ user, onLogout }) {
                         ))}
                     </div>
                 );
-
             case 'HOME':
             default:
                 return (
                     <div style={{...mobileContainerStyle, textAlign:'center'}}>
-                        <div style={{marginTop:'30px', marginBottom:'20px'}}>
+                        <div style={mobileHeaderStyle}>
+                             PROFILO 
+                             {/* TASTO MENU AGGIUNTO QUI */}
+                             <button style={settingsBtnStyle} onClick={() => setIsMobileMenuOpen(true)}><Icons.Settings /></button>
+                        </div>
+                        <div style={{marginTop:'10px', marginBottom:'20px'}}>
                             <img src={user?.avatar_chat || '/icone/mini_avatar.png'} style={{width:'110px', height:'110px', borderRadius:'50%', border:'2px solid #c9a84a', padding:'3px', objectFit:'cover'}} alt="" />
                             <h2 style={{color: '#c9a84a', fontFamily: "'Cinzel', serif", margin:'15px 0 5px 0', fontSize:'24px'}}>{user?.nome_pg}</h2>
                             <span style={{fontSize:'12px', color:'#888', letterSpacing:'1px'}}>{user?.permesso}</span>
@@ -217,109 +196,79 @@ function GameLayout({ user, onLogout }) {
                             <div style={{background:'#1a1a1a', padding:'15px', borderRadius:'6px', border:'1px solid #333'}}><div style={{fontSize:'10px', color:'#888', marginBottom:'5px', textTransform:'uppercase'}}>Rem (¥)</div><div style={{fontSize:'20px', fontWeight:'bold', color:'#c9a84a', fontFamily:"'Cinzel', serif"}}>{user?.rem || 0}</div></div>
                         </div>
                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'30px'}}>
-                             <button onClick={handleCollectSalary} style={actionBtnStyle('201, 168, 74')}><Icons.Money /> Ritira Stipendio</button>
-                             <button onClick={handleEnterHouse} style={actionBtnStyle('162, 112, 255')}><Icons.Home /> Entra in Casa</button>
+                             <button onClick={handleCollectSalary} style={actionBtnStyle('201, 168, 74')}><Icons.Money /> Stipendio</button>
+                             <button onClick={handleEnterHouse} style={actionBtnStyle('162, 112, 255')}><Icons.Home /> Casa</button>
                         </div>
-                        <button onClick={onLogout} style={{width:'100%', padding:'15px', background:'rgba(255, 68, 68, 0.1)', border:'1px solid #ff4444', color:'#ff4444', borderRadius:'6px', fontWeight:'bold', display:'flex', alignItems:'center', justifyContent:'center', gap:'10px'}}><Icons.Logout /> DISCONNETTI</button>
                     </div>
                 );
         }
     };
 
+    if (!user) return <div style={{width:'100vw', height:'100vh', background:'#050508', display:'flex', justifyContent:'center', alignItems:'center', color:'#c9a84a'}}>Caricamento...</div>;
 
-    // =========================================================
-    // 4. SAFETY CHECK
-    // =========================================================
-    if (!user) {
-        return <div style={{width:'100vw', height:'100vh', background:'#050508', display:'flex', justifyContent:'center', alignItems:'center', color:'#c9a84a'}}>Caricamento...</div>;
-    }
-
-    // =========================================================
-    // 5. RENDER FINALE (DESKTOP / MOBILE SWITCH)
-    // =========================================================
     return (
         <div className="game-container">
-            {/* --- DESKTOP VIEW --- */}
             {!isMobile && (
                 <>
-                    <Header 
-                        user={user} onLogout={onLogout}
-                        onToggleGuida={() => setIsGuidaOpen(!isGuidaOpen)}
-                        onToggleAmbientazione={() => setIsAmbientazioneOpen(!isAmbientazioneOpen)}
-                        onToggleShinigami={() => setIsShinigamiOpen(!isShinigamiOpen)}
-                    />
-                    
-                    <LeftSidebar 
-                        user={user}
-                        onToggleScheda={handleToggleScheda} 
-                        onToggleBanca={() => setIsBancaOpen(!isBancaOpen)}
-                        onToggleMessages={() => setIsMessagingOpen(!isMessagingOpen)}
-                        onToggleMercato={handleToggleMercato}
-                    />
-                    
-                    <main className="main-content">
-                        <div className="content-wrapper">
-                            <Outlet context={{ map: currentMap, children: currentChildren, onZoneClick: handleZoneClick, onGoBack: handleGoBack }} />
-                        </div>
-                    </main>
-                    
-                    <RightSidebar 
-                        user={user}
-                        currentMap={currentMap} 
-                        onOpenChat={handleZoneClick} 
-                        onOpenScheda={handleOpenPublicScheda} 
-                    />
-                    
-                    {/* MODALI DESKTOP (TUTTI CON user={user}!) */}
+                    <Header user={user} onLogout={onLogout} onToggleGuida={() => setIsGuidaOpen(!isGuidaOpen)} onToggleAmbientazione={() => setIsAmbientazioneOpen(!isAmbientazioneOpen)} onToggleShinigami={() => setIsShinigamiOpen(!isShinigamiOpen)} />
+                    <LeftSidebar user={user} onToggleScheda={handleToggleScheda} onToggleBanca={() => setIsBancaOpen(!isBancaOpen)} onToggleMessages={() => setIsMessagingOpen(!isMessagingOpen)} onToggleMercato={handleToggleMercato} />
+                    <main className="main-content"><div className="content-wrapper"><Outlet context={{ map: currentMap, children: currentChildren, onZoneClick: handleZoneClick, onGoBack: handleGoBack }} /></div></main>
+                    <RightSidebar user={user} currentMap={currentMap} onOpenChat={handleZoneClick} onOpenScheda={handleOpenPublicScheda} />
                     {isSchedaOpen && <SchedaPersonaggio user={user} targetUser={schedaTargetUser} onClose={() => setIsSchedaOpen(false)} onOpenChat={handleZoneClick} />}
                     {isBancaOpen && <Banca user={user} onClose={() => setIsBancaOpen(false)} />}
                     {isMessagingOpen && <MessagingManager isVisible={true} onClose={() => setIsMessagingOpen(false)} isMobile={false} />}
-                    
-                    {/* Le modali che chiedevi */}
                     {isGuidaOpen && <Guida user={user} onClose={()=>setIsGuidaOpen(false)} />}
                     {isAmbientazioneOpen && <Ambientazione user={user} onClose={()=>setIsAmbientazioneOpen(false)} />}
                     {isShinigamiOpen && <Shinigami user={user} onClose={()=>setIsShinigamiOpen(false)} />}
                     {isMercatoOpen && <Mercato user={user} onClose={()=>setIsMercatoOpen(false)} />}
-
-                    {/* Chat Windows Desktop */}
                     <div className="chat-windows-area" style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', pointerEvents:'none', zIndex:105}}>
-                        {openChats.map((chat, index) => (
-                            <div key={chat.id} style={{pointerEvents:'auto', width:'100%', height:'100%'}}>
-                                <ChatWindow chat={chat} onClose={handleCloseChat} user={user} isMobile={false} />
-                            </div>
-                        ))}
+                        {openChats.map((chat) => (<div key={chat.id} style={{pointerEvents:'auto', width:'100%', height:'100%'}}><ChatWindow chat={chat} onClose={handleCloseChat} user={user} isMobile={false} /></div>))}
                     </div>
+                    {/* DOCK DESKTOP (Fuori dal contenitore fisso mobile) */}
+                    <Dock isMobile={false} openChats={openChats} onRestoreChat={handleRestoreChat} onTabChange={setActiveMobileTab} activeTab={activeMobileTab} />
                 </>
             )}
 
-{isMobile && (
-    <div style={{
-        position: 'fixed',       // ESCI dal flusso normale del documento
-        top: 0,
-        left: 0,
-        right: 0,                // Forza larghezza piena
-        bottom: 0,               // Forza altezza piena
-        width: '100vw',
-        height: '100vh',         // Usa viewport height
-        overflowY: 'auto',       // Scrolla se serve
-        background: '#050508',
-        zIndex: 99999,           // SOPRA a tutto, anche all'header di React
-        margin: 0,
-        padding: 0,
-        display: 'block'         // Resetta eventuali flexbox ereditati
-    }}>
-        {renderMobileContent()}
-    </div>
-)}
+            {isMobile && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    width: '100vw', height: '100vh', overflowY: 'auto', background: '#050508', zIndex: 9999,
+                    margin: 0, padding: 0, display: 'block'
+                }}>
+                    {renderMobileContent()}
+                    
+                    {/* DOCK SPOSTATA QUI: Ora è DENTRO il contenitore con z-index alto, quindi si vede! */}
+                    {!openChats.length && (
+                        <Dock 
+                            isMobile={true} 
+                            openChats={openChats} 
+                            onRestoreChat={handleRestoreChat} 
+                            onTabChange={setActiveMobileTab} 
+                            activeTab={activeMobileTab} 
+                        />
+                    )}
 
-            {/* Dock comune */}
-            <Dock 
-                isMobile={isMobile}
-                openChats={openChats}
-                onRestoreChat={handleRestoreChat}
-                onTabChange={setActiveMobileTab} 
-                activeTab={activeMobileTab}
-            />
+                    {/* MOBILE MENU (Quello che mi hai incollato) */}
+                    <MobileMenu 
+                        isOpen={isMobileMenuOpen}
+                        onClose={() => setIsMobileMenuOpen(false)}
+                        user={user}
+                        onLogout={onLogout}
+                        currentMapName={currentMap?.name}
+                        mapChildren={currentChildren}
+                        onZoneClick={handleZoneClick}
+                        onGoBack={handleGoBack}
+                        onToggleGuida={() => setIsGuidaOpen(true)}
+                        onToggleAmbientazione={() => setIsAmbientazioneOpen(true)}
+                        onToggleShinigami={() => setIsShinigamiOpen(true)}
+                    />
+                    
+                    {/* Modali anche per mobile se servono */}
+                    {isGuidaOpen && <Guida user={user} onClose={()=>setIsGuidaOpen(false)} />}
+                    {isAmbientazioneOpen && <Ambientazione user={user} onClose={()=>setIsAmbientazioneOpen(false)} />}
+                    {isShinigamiOpen && <Shinigami user={user} onClose={()=>setIsShinigamiOpen(false)} />}
+                </div>
+            )}
         </div>
     );
 }
