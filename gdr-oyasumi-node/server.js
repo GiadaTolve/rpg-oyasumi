@@ -1446,18 +1446,72 @@ app.post('/api/bank/leave-job', verificaToken, async (req, res) => {
 // =================================================================
 
 app.get('/api/pm/conversations', verificaToken, async (req, res) => {
+    const myId = req.utente.id;
+
     try {
-        const myId = req.utente.id;
-        const result = await db.raw(`
-            SELECT u.id_utente, u.nome_pg, u.avatar_chat,
-                (SELECT text FROM private_messages WHERE (sender_id = u.id_utente AND receiver_id = ?) OR (sender_id = ? AND receiver_id = u.id_utente) ORDER BY timestamp DESC LIMIT 1) as last_message,
-                (SELECT timestamp FROM private_messages WHERE (sender_id = u.id_utente AND receiver_id = ?) OR (sender_id = ? AND receiver_id = u.id_utente) ORDER BY timestamp DESC LIMIT 1) as last_message_timestamp,
-                (SELECT COUNT(*) FROM private_messages WHERE sender_id = u.id_utente AND receiver_id = ? AND is_read = 0) as unread_count
-            FROM (SELECT DISTINCT CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END as user_id FROM private_messages WHERE sender_id = ? OR receiver_id = ?) as conv
-            JOIN utenti u ON conv.user_id = u.id_utente ORDER BY last_message_timestamp DESC
-        `, [myId, myId, myId, myId, myId, myId, myId, myId]);
-        res.json(result.rows || result);
-    } catch (error) { res.status(500).json({ message: "Errore." }); }
+        // 1. Scarichiamo TUTTI i messaggi che riguardano l'utente (inviati o ricevuti)
+        // Ordinati dal più recente al più vecchio
+        const messages = await db('private_messages')
+            .where({ sender_id: myId })
+            .orWhere({ receiver_id: myId })
+            .orderBy('timestamp', 'desc');
+
+        // 2. Elaboriamo la lista manualmente per trovare l'ultima conversazione per ogni utente
+        const conversationMap = new Map();
+
+        for (const msg of messages) {
+            // Chi è l'altro utente?
+            const otherId = (msg.sender_id === myId) ? msg.receiver_id : msg.sender_id;
+
+            // Se non abbiamo già processato questo utente, è il messaggio più recente (perché abbiamo ordinato desc)
+            if (!conversationMap.has(otherId)) {
+                conversationMap.set(otherId, {
+                    last_message: msg.text,
+                    last_message_timestamp: msg.timestamp,
+                    unread_count: 0, // Lo calcoleremo dopo
+                    otherId: otherId // Ci serve per fare la query utente dopo
+                });
+            }
+            
+            // Calcolo messaggi non letti (Se sono il ricevente e non è letto)
+            if (msg.receiver_id === myId && !msg.is_read) {
+                const conv = conversationMap.get(otherId);
+                conv.unread_count += 1;
+            }
+        }
+
+        // 3. Recuperiamo i dati degli utenti (Nomi e Avatar)
+        const conversations = [];
+        const partnerIds = Array.from(conversationMap.keys());
+
+        if (partnerIds.length > 0) {
+            const partners = await db('utenti')
+                .select('id', 'nome_pg', 'avatar_chat')
+                .whereIn('id', partnerIds);
+
+            // 4. Uniamo i dati
+            partners.forEach(partner => {
+                const convData = conversationMap.get(partner.id);
+                conversations.push({
+                    id_utente: partner.id,
+                    nome_pg: partner.nome_pg,
+                    avatar_chat: partner.avatar_chat,
+                    last_message: convData.last_message,
+                    last_message_timestamp: convData.last_message_timestamp,
+                    unread_count: convData.unread_count
+                });
+            });
+        }
+
+        // 5. Ordiniamo le conversazioni finali per data (più recenti in alto)
+        conversations.sort((a, b) => new Date(b.last_message_timestamp) - new Date(a.last_message_timestamp));
+
+        res.json(conversations);
+
+    } catch (error) {
+        console.error("Errore recupero conversazioni:", error);
+        res.status(500).json({ message: 'Errore interno del server.' });
+    }
 });
 
 app.get('/api/pm/conversation/:userId', verificaToken, async (req, res) => {
