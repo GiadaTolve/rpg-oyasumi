@@ -23,8 +23,6 @@ function GameLayoutMobile({ user, onLogout }) {
     // --- STATI ---
     const [activeTab, setActiveTab] = useState('HOME'); 
     const [openChat, setOpenChat] = useState(null); 
-    
-    // Stato per aprire chat privata da "Presenti"
     const [targetPrivateUser, setTargetPrivateUser] = useState(null);
 
     // --- DATI ---
@@ -76,11 +74,7 @@ function GameLayoutMobile({ user, onLogout }) {
         } catch (e) { alert("Non hai una casa."); }
     };
 
-    // --- NUOVO: APRI CHAT PRIVATA DA UTENTE ---
     const handleOpenPrivateChat = (targetUser) => {
-        // Mappiamo l'oggetto utente (socket) a quello che si aspetta MessagingManager (DB)
-        // Nota: OnlineUsers da socket ha 'id', MessagingManager usa 'id_utente'. 
-        // Sono lo stesso valore numerico.
         const mappedUser = {
             id_utente: targetUser.id,
             nome_pg: targetUser.nome_pg,
@@ -107,12 +101,19 @@ function GameLayoutMobile({ user, onLogout }) {
                         <div style={headerStyle}><span style={{color:'#a270ff'}}><Icons.Pin /></span> {currentMap?.name || 'Mappa'}</div>
                         {currentMap?.parent_id && <button onClick={handleGoBack} style={{...cardStyle, justifyContent:'center', color:'#fff', background:'#2a2930', marginBottom:'20px'}}><span style={{marginRight:'8px'}}><Icons.Back /></span> INDIETRO</button>}
                         <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
-                            {currentChildren.map(child => (
-                                <div key={child.id} onClick={() => handleZoneClick(child)} style={cardStyle}>
-                                    <span style={{marginRight:'15px', color: child.type === 'CHAT' ? '#a270ff' : '#c9a84a'}}>{child.type === 'CHAT' ? <Icons.Chat /> : <Icons.MapZone />}</span>
-                                    <div><div style={{fontWeight:'bold', fontSize:'15px', color:'#fff'}}>{child.name}</div><div style={{fontSize:'11px', color:'#888', marginTop:'2px'}}>{child.type === 'CHAT' ? 'Entra in Chat' : 'Esplora Zona'}</div></div>
-                                </div>
-                            ))}
+                            
+                            {/* --- FIX LISTA VUOTA --- */}
+                            {(!currentChildren || currentChildren.length === 0) ? (
+                                <div style={{textAlign:'center', color:'#666', fontStyle:'italic', marginTop:'20px'}}>Nessuna zona qui.</div>
+                            ) : (
+                                currentChildren.map(child => (
+                                    <div key={child.id} onClick={() => handleZoneClick(child)} style={cardStyle}>
+                                        <span style={{marginRight:'15px', color: child.type === 'CHAT' ? '#a270ff' : '#c9a84a'}}>{child.type === 'CHAT' ? <Icons.Chat /> : <Icons.MapZone />}</span>
+                                        <div><div style={{fontWeight:'bold', fontSize:'15px', color:'#fff'}}>{child.name}</div><div style={{fontSize:'11px', color:'#888', marginTop:'2px'}}>{child.type === 'CHAT' ? 'Entra in Chat' : 'Esplora Zona'}</div></div>
+                                    </div>
+                                ))
+                            )}
+
                         </div>
                     </div>
                 );
@@ -122,7 +123,6 @@ function GameLayoutMobile({ user, onLogout }) {
                     isVisible={true} 
                     onClose={() => setActiveTab('HOME')} 
                     isMobile={true} 
-                    // Passiamo l'utente target e la funzione per pulirlo
                     targetUser={targetPrivateUser}
                     onClearTarget={() => setTargetPrivateUser(null)}
                 />;
@@ -137,7 +137,6 @@ function GameLayoutMobile({ user, onLogout }) {
                                     <img src={u.avatar_chat || '/icone/mini_avatar.png'} style={{width:'40px', height:'40px', borderRadius:'50%', objectFit:'cover', border:'1px solid #444'}} alt="" />
                                     <span style={{fontWeight:'bold', fontSize:'14px'}}>{u.nome_pg}</span>
                                 </div>
-                                {/* CLICK PER SCRIVERE MESSAGGIO */}
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); handleOpenPrivateChat(u); }}
                                     style={{background:'none', border:'none', cursor:'pointer', color:'#c9a84a'}}
@@ -172,8 +171,19 @@ function GameLayoutMobile({ user, onLogout }) {
         }
     };
 
+    // --- FIX NUCLEARE PER DEPLOY ---
     return (
-        <div style={{width:'100%', minHeight:'100vh', background:'#050508', overflowX:'hidden'}}>
+        <div style={{
+            position: 'fixed',
+            top: 0, 
+            left: 0, 
+            width: '100vw', 
+            height: '100%', 
+            overflowY: 'auto', 
+            background: '#050508', 
+            zIndex: 9999, // Forza sopra a tutto
+            display: 'block' // Resetta flex ereditati
+        }}>
             {renderContent()}
             {!openChat && <Dock isMobile={true} activeTab={activeTab} onTabChange={setActiveTab} openChats={[]} />}
         </div>

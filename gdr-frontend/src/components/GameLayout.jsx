@@ -292,9 +292,22 @@ function GameLayout({ user, onLogout }) {
                 </>
             )}
 
-            {/* --- MOBILE VIEW --- */}
-            {isMobile && (
-    <div style={{width:'100%', height:'100%', overflowY:'auto', position:'relative', background:'#050508'}}>
+{isMobile && (
+    <div style={{
+        position: 'fixed',       // ESCI dal flusso normale del documento
+        top: 0,
+        left: 0,
+        right: 0,                // Forza larghezza piena
+        bottom: 0,               // Forza altezza piena
+        width: '100vw',
+        height: '100vh',         // Usa viewport height
+        overflowY: 'auto',       // Scrolla se serve
+        background: '#050508',
+        zIndex: 99999,           // SOPRA a tutto, anche all'header di React
+        margin: 0,
+        padding: 0,
+        display: 'block'         // Resetta eventuali flexbox ereditati
+    }}>
         {renderMobileContent()}
     </div>
 )}
