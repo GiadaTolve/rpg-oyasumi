@@ -1449,38 +1449,35 @@ app.get('/api/pm/conversations', verificaToken, async (req, res) => {
     const myId = req.utente.id;
 
     try {
-        // 1. Scarichiamo TUTTI i messaggi che riguardano l'utente (inviati o ricevuti)
-        // Ordinati dal più recente al più vecchio
+        // 1. Scarichiamo TUTTI i messaggi che ti riguardano
         const messages = await db('private_messages')
             .where({ sender_id: myId })
             .orWhere({ receiver_id: myId })
             .orderBy('timestamp', 'desc');
 
-        // 2. Elaboriamo la lista manualmente per trovare l'ultima conversazione per ogni utente
+        // 2. Elaboriamo la lista manualmente (più sicuro che fare query SQL complesse)
         const conversationMap = new Map();
 
         for (const msg of messages) {
-            // Chi è l'altro utente?
             const otherId = (msg.sender_id === myId) ? msg.receiver_id : msg.sender_id;
 
-            // Se non abbiamo già processato questo utente, è il messaggio più recente (perché abbiamo ordinato desc)
             if (!conversationMap.has(otherId)) {
                 conversationMap.set(otherId, {
                     last_message: msg.text,
                     last_message_timestamp: msg.timestamp,
-                    unread_count: 0, // Lo calcoleremo dopo
-                    otherId: otherId // Ci serve per fare la query utente dopo
+                    unread_count: 0, 
+                    otherId: otherId
                 });
             }
             
-            // Calcolo messaggi non letti (Se sono il ricevente e non è letto)
+            // Conta i non letti
             if (msg.receiver_id === myId && !msg.is_read) {
                 const conv = conversationMap.get(otherId);
                 conv.unread_count += 1;
             }
         }
 
-        // 3. Recuperiamo i dati degli utenti (Nomi e Avatar)
+        // 3. Recuperiamo i nomi e avatar degli interlocutori
         const conversations = [];
         const partnerIds = Array.from(conversationMap.keys());
 
@@ -1489,7 +1486,6 @@ app.get('/api/pm/conversations', verificaToken, async (req, res) => {
                 .select('id', 'nome_pg', 'avatar_chat')
                 .whereIn('id', partnerIds);
 
-            // 4. Uniamo i dati
             partners.forEach(partner => {
                 const convData = conversationMap.get(partner.id);
                 conversations.push({
@@ -1503,7 +1499,7 @@ app.get('/api/pm/conversations', verificaToken, async (req, res) => {
             });
         }
 
-        // 5. Ordiniamo le conversazioni finali per data (più recenti in alto)
+        // 4. Ordiniamo per data
         conversations.sort((a, b) => new Date(b.last_message_timestamp) - new Date(a.last_message_timestamp));
 
         res.json(conversations);

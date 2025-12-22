@@ -294,10 +294,10 @@ function GameLayout({ user, onLogout }) {
 
             {/* --- MOBILE VIEW --- */}
             {isMobile && (
-                <div style={{width:'100%', height:'100%', overflow:'hidden', position:'relative', background:'#050508'}}>
-                    {renderMobileContent()}
-                </div>
-            )}
+    <div style={{width:'100%', height:'100%', overflowY:'auto', position:'relative', background:'#050508'}}>
+        {renderMobileContent()}
+    </div>
+)}
 
             {/* Dock comune */}
             <Dock 
