@@ -274,14 +274,16 @@ app.get('/api/users/find', verificaToken, async (req, res) => {
     if (!name) return res.status(400).json({ message: 'Il nome del personaggio è richiesto.' });
 
     try {
-        const user = await db('utenti')
+        // --- MODIFICA QUI ---
+        // Prima cercava match esatto (=). Ora cerca parziale (LIKE %...%)
+        const users = await db('utenti')
             .select('id_utente', 'nome_pg', 'avatar_chat')
-            .where(db.raw('LOWER(nome_pg) = LOWER(?)', [name.trim()])) 
+            .where('nome_pg', 'ilike', `${name}%`) // 'ilike' è case-insensitive per Postgres. Se usi SQLite usa 'like'
             .andWhere('id_utente', '!=', myId)
-            .first();
+            .limit(5); // Limitiamo a 5 suggerimenti
 
-        if (user) res.json(user);
-        else res.status(404).json({ message: `Nessun giocatore di nome "${name}" è stato trovato.` });
+        // Restituiamo un array, non un singolo oggetto
+        res.json(users); 
 
     } catch (error) {
         console.error("Errore nella ricerca dell'utente:", error);

@@ -4,39 +4,87 @@ import ConversationList from './ConversationList';
 import PrivateChatWindow from './PrivateChatWindow';
 import api from '../api';
 
-const styles = {
-    dockContainer: {
-        position: 'fixed',
-        bottom: 0,
-        right: '20px',
-        zIndex: 1000,
-        display: 'flex',
-        alignItems: 'flex-end',
-        gap: '10px',
-        pointerEvents: 'none', // Lascia cliccare il gioco sotto se non sei sopra la chat
-    },
-    // Wrapper che rende cliccabile la finestra
-    windowWrapper: {
-        pointerEvents: 'auto',
-        boxShadow: '0 0 20px rgba(0,0,0,0.8)',
-        borderRadius: '10px 10px 0 0',
-        overflow: 'hidden',
-    }
-};
-
-function MessagingManager({ isVisible, onClose }) {
+function MessagingManager({ isVisible, onClose, isMobile, targetUser, onClearTarget }) {
     const socket = useContext(SocketContext);
+    
+    // Inizializza direttamente con targetUser se presente (Fix apertura da Presenti)
+    const [activeChatUser, setActiveChatUser] = useState(targetUser || null); 
     const [conversations, setConversations] = useState([]);
-    const [activeChatUser, setActiveChatUser] = useState(null); 
-    const [isMinimized, setIsMinimized] = useState(false);
 
-    // Carica lista conversazioni
+    // Stili dinamici
+    const styles = {
+        dockContainer: {
+            position: 'fixed',
+            top: isMobile ? 0 : 'auto', 
+            bottom: isMobile ? '60px' : 0, 
+            left: isMobile ? 0 : 'auto',
+            right: isMobile ? 0 : '20px',
+            width: isMobile ? '100%' : 'auto',
+            height: isMobile ? 'calc(100% - 60px)' : 'auto',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'flex-end',
+            gap: '10px',
+            pointerEvents: isMobile ? 'auto' : 'none', 
+            backgroundColor: isMobile ? '#050508' : 'transparent', 
+        },
+        windowWrapper: {
+            pointerEvents: 'auto',
+            boxShadow: '0 0 20px rgba(0,0,0,0.8)',
+            borderRadius: isMobile ? '0' : '10px 10px 0 0',
+            overflow: 'hidden',
+            width: isMobile ? '100%' : '320px', 
+            height: isMobile ? '100%' : '450px', 
+            display: 'flex',
+            flexDirection: 'column',
+            backgroundColor: '#111',
+            border: '1px solid #333'
+        }
+    };
+
+    // --- 1. GESTIONE TARGET ESTERNO (DA PRESENTI) ---
+    useEffect(() => {
+        if (targetUser) {
+            setActiveChatUser(targetUser);
+            // Salviamo questa conversazione "forzatamente" nella lista locale
+            updateLocalConversations(targetUser);
+            if (onClearTarget) onClearTarget();
+        }
+    }, [targetUser, onClearTarget]);
+
+    // --- 2. GESTIONE CONVERSAZIONI (CON FALLBACK LOCALSTORAGE) ---
+    
+    // Funzione per aggiornare la lista locale (Fallback per server error)
+    const updateLocalConversations = (userObj) => {
+        setConversations(prev => {
+            // Rimuovi se esiste già per rimetterlo in cima
+            const others = prev.filter(c => c.id_utente !== userObj.id_utente);
+            const newItem = {
+                id_utente: userObj.id_utente,
+                nome_pg: userObj.nome_pg,
+                avatar_chat: userObj.avatar_chat,
+                last_message: "Chat aperta",
+                last_message_timestamp: new Date().toISOString(),
+                unread_count: 0
+            };
+            const newList = [newItem, ...others];
+            // Salva nel browser
+            localStorage.setItem('cached_conversations', JSON.stringify(newList));
+            return newList;
+        });
+    };
+
     const fetchConversations = useCallback(async () => {
         try {
             const res = await api.get('/pm/conversations');
             setConversations(res.data);
-        } catch (error) {
-            console.error("Errore PM:", error);
+            // Aggiorniamo la cache se il server risponde bene
+            localStorage.setItem('cached_conversations', JSON.stringify(res.data));
+        } catch (error) { 
+            console.warn("Server PM Error (Using Cache):", error);
+            // Se il server fallisce, usiamo la cache locale
+            const cached = localStorage.getItem('cached_conversations');
+            if (cached) setConversations(JSON.parse(cached));
         }
     }, []);
 
@@ -44,20 +92,18 @@ function MessagingManager({ isVisible, onClose }) {
         if (isVisible) fetchConversations();
     }, [isVisible, fetchConversations]);
 
-    // Ascolta nuovi messaggi per aggiornare la lista o la chat aperta
+    // Socket Listener
     useEffect(() => {
-        const handleNewMessage = (message) => {
-            // Se arriva un messaggio, ricarica la lista per mostrarlo in cima
-            fetchConversations(); 
+        if (!socket) return;
+        const handleRefresh = () => fetchConversations();
+        
+        socket.on('new_private_message', handleRefresh);
+        socket.on('private_message_sent', handleRefresh);
+        
+        return () => {
+            socket.off('new_private_message', handleRefresh);
+            socket.off('private_message_sent', handleRefresh);
         };
-        if(socket) {
-            socket.on('new_private_message', handleNewMessage);
-            socket.on('private_message_sent', handleNewMessage);
-            return () => {
-                socket.off('new_private_message', handleNewMessage);
-                socket.off('private_message_sent', handleNewMessage);
-            };
-        }
     }, [socket, fetchConversations]);
 
     if (!isVisible) return null;
@@ -68,14 +114,24 @@ function MessagingManager({ isVisible, onClose }) {
                 {activeChatUser ? (
                     <PrivateChatWindow
                         partner={activeChatUser}
-                        onBack={() => setActiveChatUser(null)} // Torna alla lista
-                        onClose={onClose} // Chiude tutto
+                        onBack={() => {
+                            setActiveChatUser(null);
+                            fetchConversations(); 
+                        }} 
+                        onClose={onClose} 
+                        isMobile={isMobile} 
+                        // Passiamo una callback per aggiornare la lista quando invii un msg
+                        onMessageSent={() => updateLocalConversations(activeChatUser)}
                     />
                 ) : (
                     <ConversationList
                         conversations={conversations}
-                        onSelectUser={(user) => setActiveChatUser(user)}
+                        onSelectUser={(user) => {
+                            setActiveChatUser(user);
+                            updateLocalConversations(user); // Metti in cima alla lista
+                        }}
                         onClose={onClose}
+                        isMobile={isMobile}
                     />
                 )}
             </div>

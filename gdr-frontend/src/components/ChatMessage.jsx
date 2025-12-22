@@ -139,61 +139,68 @@ const formatTimestamp = (isoString) => {
 };
 
 function ChatMessage({ msg }) {
+  // --- MODIFICA: Rilevamento Mobile Semplice ---
+  const isMobile = window.innerWidth <= 768; 
 
-// 1. MESSAGGIO GLOBALE (Admin)
-if (msg.tipo === 'globale') {
-  return (
-    <div style={styles.globale}>
-      <strong style={{color:'#a270ff', display:'block', marginBottom:'5px', fontSize:'14px'}}>
-          ✦ MESSAGGIO GLOBALE ✦
-      </strong>
-      <p style={{margin: 0, fontWeight: 'normal', fontFamily: "'Inter', sans-serif"}}>{msg.testo}</p>
-    </div>
-  );
-}
-
-// 2. MESSAGGIO SHINIGAMI (Masterscreen)
-// Layout completamente diverso: niente avatar, niente header standard.
-if (msg.tipo === 'masterscreen') {
+  // 1. MESSAGGIO GLOBALE (Admin)
+  if (msg.tipo === 'globale') {
     return (
-        <div style={styles.masterscreenContainer}>
-            {/* Testo del master */}
-            <div style={styles.masterscreenText}>
+      <div style={styles.globale}>
+        <strong style={{color:'#a270ff', display:'block', marginBottom:'5px', fontSize:'14px'}}>
+            ✦ MESSAGGIO GLOBALE ✦
+        </strong>
+        <p style={{margin: 0, fontWeight: 'normal', fontFamily: "'Inter', sans-serif"}}>{msg.testo}</p>
+      </div>
+    );
+  }
+
+  // 2. MESSAGGIO SHINIGAMI (Masterscreen)
+  if (msg.tipo === 'masterscreen') {
+      return (
+          <div style={styles.masterscreenContainer}>
+              <div style={styles.masterscreenText}>
+                  <TextParser text={msg.testo} />
+              </div>
+              <div style={styles.masterscreenSignature}>
+                  — Shinigami ({msg.autore})
+              </div>
+          </div>
+      );
+  }
+
+  // 3. MESSAGGIO STANDARD (Giocatori)
+  return (
+    <div style={{
+      ...styles.messageContainer,
+      // Su mobile togliamo il padding extra e riduciamo il margine
+      paddingLeft: isMobile ? '0' : styles.messageContainer.paddingLeft,
+      marginBottom: isMobile ? '10px' : styles.messageContainer.marginBottom
+    }}>
+        <div style={styles.header}>
+            <span style={styles.timestamp}>{formatTimestamp(msg.timestamp)}</span>
+            <span style={styles.author}>{msg.autore}</span>
+            {msg.luogo && msg.luogo.trim() !== '' && (
+                <span style={styles.luogoTag}>{msg.luogo}</span>
+            )}
+        </div>
+
+        <div style={styles.content}>
+            {/* L'avatar viene nascosto se siamo su mobile */}
+            <img 
+                src={msg.avatar_url || '/icone/mini_avatar.png'} 
+                alt={msg.autore} 
+                style={{
+                  ...styles.avatar,
+                  display: isMobile ? 'none' : 'block' // <--- QUESTA È LA MODIFICA CHIAVE
+                }}
+            />
+            <div style={{...styles.text, ...(msg.tipo === 'dado' ? styles.dado : {})}}>
+                {msg.tipo === 'dado' && '🎲 '}
                 <TextParser text={msg.testo} />
             </div>
-            
-            {/* Firma in basso a destra */}
-            <div style={styles.masterscreenSignature}>
-                — Shinigami ({msg.autore})
-            </div>
         </div>
-    );
-}
-
-// 3. MESSAGGIO STANDARD (Giocatori)
-return (
-  <div style={styles.messageContainer}>
-      <div style={styles.header}>
-          <span style={styles.timestamp}>{formatTimestamp(msg.timestamp)}</span>
-          <span style={styles.author}>{msg.autore}</span>
-          {msg.luogo && msg.luogo.trim() !== '' && (
-              <span style={styles.luogoTag}>{msg.luogo}</span>
-          )}
-      </div>
-
-      <div style={styles.content}>
-          <img 
-              src={msg.avatar_url || '/icone/mini_avatar.png'} 
-              alt={msg.autore} 
-              style={styles.avatar}
-          />
-          <div style={{...styles.text, ...(msg.tipo === 'dado' ? styles.dado : {})}}>
-              {msg.tipo === 'dado' && '🎲 '}
-              <TextParser text={msg.testo} />
-          </div>
-      </div>
-  </div>
-);
+    </div>
+  );
 }
 
 export default ChatMessage;
