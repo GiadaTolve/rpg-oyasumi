@@ -188,23 +188,32 @@ app.get('/', (req, res) => {
 app.post('/api/register', async (req, res) => {
     try {
         const { email, password, nome_pg, playerPreferences } = req.body;
+        
+        // 1. Validazione input
         if (!email || !password || !nome_pg) {
             return res.status(400).json({ message: 'Tutti i campi sono obbligatori.' });
         }
         
+        // 2. Hash della password
         const hashedPassword = await bcrypt.hash(password, 10);
         
+        // 3. Singola Transazione per DB e Logica Email
         const newUserId = await db.transaction(async (trx) => {
-            const [userIdResult] = await trx('utenti').insert({
-                email,
-                password: hashedPassword,
-                nome_pg,
-                preferenze_gioco: playerPreferences
-            }).returning('id_utente');
+            
+            // Inserimento utente nel database
+            const [userIdResult] = await trx('utenti')
+                .insert({
+                    email,
+                    password: hashedPassword,
+                    nome_pg,
+                    preferenze_gioco: playerPreferences
+                })
+                .returning('id_utente');
 
+            // Normalizzazione ID per PostgreSQL o SQLite
             const userId = (typeof userIdResult === 'object') ? userIdResult.id_utente : userIdResult;
 
-            // Invio Email (Configurazione Nodemailer)
+            // --- CONFIGURAZIONE NODEMAILER ---
             const transporter = nodemailer.createTransport({
                 service: 'gmail',
                 auth: {
@@ -213,19 +222,45 @@ app.post('/api/register', async (req, res) => {
                 },
             });
 
-            // (Codice invio email omesso per brevità, ma qui c'era la logica originale)
-            // ...
+            const mailOptions = {
+                from: '"Oyasumi Staff" <oyasumi.staff@gmail.com>',
+                to: email,
+                subject: `Benvenuto in Oyasumi, ${nome_pg}`,
+                html: `
+                    <div style="background-color: #050508; color: #bfc0d1; padding: 20px; font-family: sans-serif; border: 1px solid #31323e;">
+                        <h1 style="color: #a270ff; border-bottom: 2px solid #c9a84a; padding-bottom: 10px;">Benvenuto, Sognatore.</h1>
+                        <p>La tua registrazione su <strong>Oyasumi</strong> è stata completata con successo.</p>
+                        <p>Il tuo personaggio, <strong>${nome_pg}</strong>, è ora pronto per esplorare la realtà che sanguina.</p>
+                        <br />
+                        <p style="font-style: italic; color: #888;">"Ricorda: in questo mondo, il confine tra il sogno e l'incubo è sottile come una lama."</p>
+                        <hr style="border: 0; border-top: 1px solid #31323e; margin: 20px 0;" />
+                        <p style="font-size: 0.8em; color: #666;">Questo è un messaggio automatico dallo staff di Oyasumi.</p>
+                    </div>
+                `
+            };
 
-            return userId;
+            // Invio email (gestito asincrono per non bloccare la risposta HTTP)
+            transporter.sendMail(mailOptions).catch(err => {
+                console.error("⚠️ Errore silente invio mail:", err.message);
+            });
+
+            return userId; // Restituisce l'ID alla variabile newUserId esterna
         });
 
-        res.status(201).json({ message: 'Utente registrato con successo!', userId: newUserId });
+        // 4. Risposta al client
+        res.status(201).json({ 
+            message: 'Utente registrato con successo!', 
+            userId: newUserId 
+        });
 
     } catch (errore) {
-        console.error("Errore durante il processo di registrazione:", errore);
+        console.error("❌ Errore durante il processo di registrazione:", errore);
+        
+        // Gestione duplicati (Email già esistente)
         if (errore.code === '23505' || errore.code === 'SQLITE_CONSTRAINT') {
             return res.status(409).json({ message: 'Questa email è già stata utilizzata.' });
         }
+        
         res.status(500).json({ message: 'Errore interno del server durante la registrazione.' });
     }
 });
@@ -604,18 +639,19 @@ app.put('/api/scheda/profilo', verificaToken, gestisciAggiornamentoProfilo);
 app.post('/api/scheda/profilo', verificaToken, gestisciAggiornamentoProfilo);
 
 // BANNER
-app.get('/api/active-banner', async (req, res) => {
+app.get('/api/active-event', async (req, res) => {
     try {
-        const banner = await db('event_banners').where('is_active', 1).first();
-        res.json(banner || null);
-    } catch (error) {
-        console.error("Errore recupero banner attivo:", error);
-        res.status(500).json({ message: "Errore nel recupero del banner." });
+        const event = await db('events')
+            .where({ is_active: 1 })
+            .first();
+
+        res.json(event || null);
+    } catch (e) {
+        console.error("Errore evento attivo:", e);
+        res.status(500).json({ message: "Errore recupero evento attivo." });
     }
 });
 
-// GESTIONE BANNER (ADMIN) - Ometto CRUD completo per brevità ma le rotte c'erano
-// ... CRUD Banners ...
 
 // CHAT HISTORY
 app.get('/api/chat/:chatId/history', verificaToken, async (req, res) => {
@@ -1016,6 +1052,90 @@ app.delete('/api/admin/forum/posts/:id', verificaToken, verificaMod, async (req,
     } catch (e) {
         console.error("Errore delete post:", e);
         res.status(500).json({ message: "Errore eliminazione post." });
+    }
+});
+
+// =====================================================
+// --- ADMIN EVENTI ---
+// =====================================================
+
+
+app.get('/api/admin/events', verificaToken, verificaMod, async (req, res) => {
+    try {
+        const events = await db('events')
+            .orderBy('data_inizio', 'desc');
+        res.json(events);
+    } catch (e) {
+        console.error("Errore get events:", e);
+        res.status(500).json({ message: "Errore recupero eventi." });
+    }
+});
+
+app.post('/api/admin/events', verificaToken, verificaMod, async (req, res) => {
+    const { titolo, descrizione, data_inizio, data_fine } = req.body;
+
+    if (!titolo || !data_inizio) {
+        return res.status(400).json({ message: "Titolo e data inizio obbligatori." });
+    }
+
+    try {
+        await db('events').insert({
+            titolo,
+            descrizione,
+            data_inizio,
+            data_fine,
+            is_active: 0
+        });
+
+        res.status(201).json({ message: "Evento creato." });
+    } catch (e) {
+        console.error("Errore crea evento:", e);
+        res.status(500).json({ message: "Errore creazione evento." });
+    }
+});
+
+app.put('/api/admin/events/:id', verificaToken, verificaMod, async (req, res) => {
+    try {
+        await db('events')
+            .where({ id: req.params.id })
+            .update(req.body);
+
+        res.json({ message: "Evento aggiornato." });
+    } catch (e) {
+        console.error("Errore update evento:", e);
+        res.status(500).json({ message: "Errore aggiornamento evento." });
+    }
+});
+
+app.put('/api/admin/events/:id/activate', verificaToken, verificaMod, async (req, res) => {
+    try {
+        await db.transaction(async (trx) => {
+            // Disattiva tutti
+            await trx('events').update({ is_active: 0 });
+
+            // Attiva solo questo
+            await trx('events')
+                .where({ id: req.params.id })
+                .update({ is_active: 1 });
+        });
+
+        res.json({ message: "Evento attivato (unico attivo)." });
+    } catch (e) {
+        console.error("Errore attiva evento:", e);
+        res.status(500).json({ message: "Errore attivazione evento." });
+    }
+});
+
+app.delete('/api/admin/events/:id', verificaToken, verificaAdmin, async (req, res) => {
+    try {
+        await db('events')
+            .where({ id: req.params.id })
+            .del();
+
+        res.json({ message: "Evento eliminato." });
+    } catch (e) {
+        console.error("Errore delete evento:", e);
+        res.status(500).json({ message: "Errore eliminazione evento." });
     }
 });
 
