@@ -230,9 +230,9 @@ const MusicManagement = () => {
   );
 };
 
-// --- COMPONENTE PRINCIPALE: GESTIONE ---
 function Gestione({ user }) {
-  const getVisibleModules = () => {
+  // --- MODULI VISIBILI ---
+  const getVisibleModules = useCallback(() => {
     const allModules = [
       { id: 'users', label: 'Utenti', roles: ['ADMIN','MOD'] },
       { id: 'maps', label: 'Mappe', roles: ['ADMIN', 'MASTER'] },
@@ -242,48 +242,194 @@ function Gestione({ user }) {
       { id: 'music', label: 'Musica', roles: ['ADMIN', 'MOD'] },
       { id: 'events', label: 'Eventi', roles: ['ADMIN', 'MOD'] }
     ];
-    return allModules.filter(module => module.roles.includes(user?.permesso));
-  };
+    return allModules.filter(m => m.roles.includes(user?.permesso));
+  }, [user?.permesso]);
 
   const visibleModules = getVisibleModules();
-  const [activeModule, setActiveModule] = useState(visibleModules[0]?.id || null);
-  
+
+  // --- STATO MODULO ATTIVO ---
+  const [activeModule, setActiveModule] = useState(
+    visibleModules[0]?.id || null
+  );
+
+  // Riallinea activeModule se cambia user o permessi
+  useEffect(() => {
+    if (!visibleModules.length) {
+      setActiveModule(null);
+      return;
+    }
+
+    setActiveModule(prev =>
+      visibleModules.find(m => m.id === prev)
+        ? prev
+        : visibleModules[0].id
+    );
+  }, [visibleModules]);
+
+  // --- STATO EVENTI ---
   const [dailyEvents, setDailyEvents] = useState([]);
   const [selectedDailyEvent, setSelectedDailyEvent] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
 
-  const fetchDailyEvents = useCallback(async () => { try { const response = await api.get('/admin/daily-events'); setDailyEvents(response.data); } catch (err) { console.error(err); } }, []);
-  useEffect(() => { if (activeModule === 'events') { fetchDailyEvents(); } }, [activeModule, fetchDailyEvents]);
-  const handleSaveDailyEvent = async (eventData) => { const isEditing = !!eventData.id; const method = isEditing ? 'put' : 'post'; const url = isEditing ? `/admin/daily-events/${eventData.id}` : '/admin/daily-events'; try { await api[method](url, eventData); fetchDailyEvents(); setShowEventModal(false); } catch (err) { alert(err.response?.data?.message || "Errore."); } };
-  const handleDeleteDailyEvent = async (eventId) => { if (window.confirm("Sei sicuro?")) { try { await api.delete(`/admin/daily-events/${eventId}`); fetchDailyEvents(); } catch (err) { alert("Errore."); } } };
+  // Reset stato sensibile al cambio modulo
+  useEffect(() => {
+    setSelectedDailyEvent(null);
+    setShowEventModal(false);
+  }, [activeModule]);
 
-  const renderModule = () => {
-    if (!visibleModules.find(m => m.id === activeModule)) return null;
-    switch (activeModule) {
-      case 'users': return (<div><h2 style={styles.contentTitle}>Gestione Utenti</h2><UserManagement /></div>);
-      case 'logs': return (<div><h2 style={styles.contentTitle}>Visualizzatore Log</h2><LogViewer /></div>);
-      case 'maps': return (<div><h2 style={styles.contentTitle}>Gestione Mappe</h2><MapManagement /></div>);
-      case 'forum': return (<div><h2 style={styles.contentTitle}>Gestione Forum</h2><ForumManagement /></div>);
-      case 'banners': return (<div><h2 style={styles.contentTitle}>Gestione Banner</h2><BannerManagement /></div>);
-      case 'music': return (<div><h2 style={styles.contentTitle}>Gestione Musica</h2><MusicManagement /></div>);
-      case 'events': return (<div><h2 style={styles.contentTitle}>Gestione Eventi</h2><DailyEventsManagement events={dailyEvents} onNew={() => { setSelectedDailyEvent(null); setShowEventModal(true); }} onEdit={(event) => { setSelectedDailyEvent(event); setShowEventModal(true); }} onDelete={handleDeleteDailyEvent} /></div>);
-      default: return null;
+  const fetchDailyEvents = useCallback(async () => {
+    try {
+      const res = await api.get('/admin/daily-events');
+      setDailyEvents(res.data);
+    } catch (e) {
+      console.error(e);
+      setDailyEvents([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeModule === 'events') {
+      fetchDailyEvents();
+    }
+  }, [activeModule, fetchDailyEvents]);
+
+  const handleSaveDailyEvent = async (eventData) => {
+    const isEditing = !!eventData.id;
+    const method = isEditing ? 'put' : 'post';
+    const url = isEditing
+      ? `/admin/daily-events/${eventData.id}`
+      : '/admin/daily-events';
+
+    try {
+      await api[method](url, eventData);
+      await fetchDailyEvents();
+      setShowEventModal(false);
+      setSelectedDailyEvent(null);
+    } catch (e) {
+      alert(e.response?.data?.message || 'Errore.');
     }
   };
 
+  const handleDeleteDailyEvent = async (id) => {
+    if (!window.confirm('Sei sicuro?')) return;
+    try {
+      await api.delete(`/admin/daily-events/${id}`);
+      fetchDailyEvents();
+    } catch {
+      alert('Errore.');
+    }
+  };
+
+  // --- RENDER MODULI ---
+  const renderModule = () => {
+    if (!activeModule) return null;
+
+    switch (activeModule) {
+      case 'users':
+        return (
+          <>
+            <h2 style={styles.contentTitle}>Gestione Utenti</h2>
+            <UserManagement />
+          </>
+        );
+
+      case 'logs':
+        return (
+          <>
+            <h2 style={styles.contentTitle}>Visualizzatore Log</h2>
+            <LogViewer />
+          </>
+        );
+
+      case 'maps':
+        return (
+          <>
+            <h2 style={styles.contentTitle}>Gestione Mappe</h2>
+            <MapManagement />
+          </>
+        );
+
+      case 'forum':
+        return (
+          <>
+            <h2 style={styles.contentTitle}>Gestione Forum</h2>
+            <ForumManagement />
+          </>
+        );
+
+      case 'banners':
+        return (
+          <>
+            <h2 style={styles.contentTitle}>Gestione Banner</h2>
+            <BannerManagement />
+          </>
+        );
+
+      case 'music':
+        return (
+          <>
+            <h2 style={styles.contentTitle}>Gestione Musica</h2>
+            <MusicManagement />
+          </>
+        );
+
+      case 'events':
+        return (
+          <>
+            <h2 style={styles.contentTitle}>Gestione Eventi</h2>
+            <DailyEventsManagement
+              events={dailyEvents}
+              onNew={() => {
+                setSelectedDailyEvent(null);
+                setShowEventModal(true);
+              }}
+              onEdit={(event) => {
+                setSelectedDailyEvent(event);
+                setShowEventModal(true);
+              }}
+              onDelete={handleDeleteDailyEvent}
+            />
+          </>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  // --- RENDER PRINCIPALE ---
   return (
     <div style={styles.panelWrapper}>
       <nav style={styles.nav}>
-        {visibleModules.map(module => (
-          <button key={module.id} style={activeModule === module.id ? {...styles.navButton, ...styles.activeNavButton} : styles.navButton} onClick={() => setActiveModule(module.id)}>
-            {module.label}
+        {visibleModules.map(m => (
+          <button
+            key={m.id}
+            style={
+              activeModule === m.id
+                ? { ...styles.navButton, ...styles.activeNavButton }
+                : styles.navButton
+            }
+            onClick={() => setActiveModule(m.id)}
+          >
+            {m.label}
           </button>
         ))}
       </nav>
+
       <main style={styles.content}>
         {renderModule()}
       </main>
-      {showEventModal && <DailyEventModal event={selectedDailyEvent} onSave={handleSaveDailyEvent} onCancel={() => setShowEventModal(false)} />}
+
+      {showEventModal && (
+        <DailyEventModal
+          event={selectedDailyEvent}
+          onSave={handleSaveDailyEvent}
+          onCancel={() => {
+            setShowEventModal(false);
+            setSelectedDailyEvent(null);
+          }}
+        />
+      )}
     </div>
   );
 }
