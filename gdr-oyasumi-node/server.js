@@ -1,49 +1,65 @@
 require('dotenv').config();
 
-// --- 1. IMPORT E IMPOSTAZIONI GLOBALI ---
+// =====================================================
+// --- 1. IMPORT E IMPOSTAZIONI GLOBALI (STABILI) ---
+// =====================================================
+
 const express = require('express');
 const http = require('http');
-const { Server } = require("socket.io");
+const { Server } = require('socket.io');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
-const verificaToken = require('./authMiddleware'); // Assicurati di avere questo file
+const verificaToken = require('./authMiddleware');
 const ytdl = require('ytdl-core');
 const axios = require('axios');
 const knex = require('knex');
 const knexConfig = require('./knexfile');
 
+// =====================================================
+// --- 2. AMBIENTE & DATABASE ---
+// =====================================================
+
 const environment = process.env.NODE_ENV || 'development';
 
 if (!knexConfig[environment]) {
-    throw new Error(`Configurazione Knex mancante per ambiente: ${environment}`);
+    throw new Error(`❌ Configurazione Knex mancante per ambiente: ${environment}`);
 }
 
 const db = knex(knexConfig[environment]);
 
+// =====================================================
+// --- 3. EXPRESS & HTTP SERVER ---
+// =====================================================
+
 const app = express();
-
-
 const port = process.env.PORT || 3000;
-const allowedOrigins = [
-    "http://localhost:5173", // Per lo sviluppo in locale
-    process.env.FRONTEND_URL // Per la produzione
-].filter(Boolean);
-
 const httpServer = http.createServer(app);
 
+// =====================================================
+// --- 4. CORS (RENDER SAFE) ---
+// =====================================================
+
+const allowedOrigins = [
+    'http://localhost:5173',
+    process.env.FRONTEND_URL
+].filter(Boolean);
 
 const corsOptions = {
     origin: function (origin, callback) {
         if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) === -1) {
+        if (!allowedOrigins.includes(origin)) {
             return callback(new Error('CORS bloccato'), false);
         }
         return callback(null, true);
     },
     credentials: true
 };
+
+// =====================================================
+// --- 5. SOCKET.IO ---
+// =====================================================
 
 const io = new Server(httpServer, {
     cors: {
@@ -52,78 +68,21 @@ const io = new Server(httpServer, {
     }
 });
 
+// =====================================================
+// --- 6. MIDDLEWARE BASE ---
+// =====================================================
 
-let onlineUsers = {};
-let userSockets = new Map();
-
-// --- HELPER FUNCTIONS ---
-function calculateLevel(exp) {
-  if (exp < 100) return 1;
-  const level = Math.floor((-5 + Math.sqrt(225 + 4 * exp)) / 10);
-  return Math.min(level, 50);
-}
-
-// --- FUNZIONE DI SERVIZIO: CONTROLLO AFFITTI ---
-const checkRentDue = async (userId) => {
-    try {
-        const user = await db('utenti')
-            .join('housing_types', 'utenti.housing_id', 'housing_types.id')
-            .select('utenti.id_utente', 'utenti.rent_due_date', 'housing_types.cost_rem', 'housing_types.cost_type', 'housing_types.name')
-            .where('utenti.id_utente', userId)
-            .first();
-
-        // Se non ha casa o paga giornalmente (Ordine), ignoriamo
-        if (!user || !user.rent_due_date || user.cost_type === 'DAILY_SALARY') return;
-
-        const now = new Date();
-        const dueDate = new Date(user.rent_due_date);
-
-        // Se la data di scadenza è passata...
-        if (now > dueDate) {
-            // Controlliamo se abbiamo già mandato un avviso oggi per evitare spam
-            // Cerchiamo messaggi mandati dal SISTEMA (ID 0) nelle ultime 24 ore
-            const lastMsg = await db('private_messages')
-                .where({ receiver_id: userId, sender_id: 0 }) 
-                .andWhere('text', 'like', '%AFFITTO SCADUTO%')
-                .orderBy('timestamp', 'desc')
-                .first();
-            
-            // Se non c'è messaggio recente, inviamo il sollecito
-            if (!lastMsg || (new Date() - new Date(lastMsg.timestamp) > 86400000)) {
-                
-                const msgTesto = `⚠️ AFFITTO SCADUTO ⚠️\nGentile inquilino, il canone per "${user.name}" di ${user.cost_rem} REM è scaduto.\nEffettua il pagamento tramite il pannello Banca o verrai sfrattato.`;
-
-                await db('private_messages').insert({
-                    sender_id: 0, // 0 = ID fittizio per NPC/Sistema
-                    receiver_id: userId,
-                    text: msgTesto,
-                    is_read: 0
-                });
-                
-                console.log(`[HOUSING] Inviato sollecito affitto a User ${userId}`);
-            }
-        }
-    } catch (e) {
-        console.error("Errore controllo affitti:", e);
-    }
-};
-
-// --- 2. MIDDLEWARE ---
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-app.set('db', db);
-app.set('io', io);
+// 🔥 QUESTO ERA IL BUG CRITICO
+// Decodifica SEMPRE il token se presente
+app.use(verificaToken);
 
-// --- PERMESSI MIDDLEWARE ---
-
-const requireAuth = (req, res, next) => {
-    if (!req.utente) {
-        return res.status(401).json({ message: 'Non autenticato.' });
-    }
-    next();
-};
+// =====================================================
+// --- PERMESSI ---
+// =====================================================
 
 const verificaAdmin = (req, res, next) => {
     if (!req.utente) {
@@ -149,9 +108,81 @@ const verificaMaster = (req, res, next) => {
     return res.status(403).json({ message: 'Accesso negato: Master richiesto.' });
 };
 
-// --- 3. API ROUTES ---
 
-app.get('/', (req, res) => res.send('🔴 SERVER AGGIORNATO V2 - SETUP PRONTO'));
+// Espone db e io (utile per moduli futuri)
+app.set('db', db);
+app.set('io', io);
+
+// =====================================================
+// --- 7. STATO IN-MEMORY ---
+// =====================================================
+
+let onlineUsers = {};
+let userSockets = new Map();
+
+// =====================================================
+// --- 8. HELPER FUNCTIONS ---
+// =====================================================
+
+function calculateLevel(exp) {
+    if (!exp || exp < 100) return 1;
+    const level = Math.floor((-5 + Math.sqrt(225 + 4 * exp)) / 10);
+    return Math.min(level, 50);
+}
+
+// =====================================================
+// --- 9. SERVIZIO AFFITTI ---
+// =====================================================
+
+const checkRentDue = async (userId) => {
+    try {
+        const user = await db('utenti')
+            .join('housing_types', 'utenti.housing_id', 'housing_types.id')
+            .select(
+                'utenti.id_utente',
+                'utenti.rent_due_date',
+                'housing_types.cost_rem',
+                'housing_types.cost_type',
+                'housing_types.name'
+            )
+            .where('utenti.id_utente', userId)
+            .first();
+
+        if (!user || !user.rent_due_date || user.cost_type === 'DAILY_SALARY') return;
+
+        const now = new Date();
+        const dueDate = new Date(user.rent_due_date);
+
+        if (now > dueDate) {
+            const lastMsg = await db('private_messages')
+                .where({ receiver_id: userId, sender_id: 0 })
+                .andWhere('text', 'like', '%AFFITTO SCADUTO%')
+                .orderBy('timestamp', 'desc')
+                .first();
+
+            if (!lastMsg || (Date.now() - new Date(lastMsg.timestamp)) > 86400000) {
+                await db('private_messages').insert({
+                    sender_id: 0,
+                    receiver_id: userId,
+                    text: `⚠️ AFFITTO SCADUTO ⚠️\nIl canone per "${user.name}" (${user.cost_rem} REM) è scaduto.`,
+                    is_read: 0
+                });
+
+                console.log(`[HOUSING] Sollecito affitto inviato a user ${userId}`);
+            }
+        }
+    } catch (err) {
+        console.error('Errore controllo affitti:', err);
+    }
+};
+
+// =====================================================
+// --- 10. ROOT HEALTHCHECK (RENDER) ---
+// =====================================================
+
+app.get('/', (req, res) => {
+    res.send('🟢 OYASUMI SERVER ONLINE');
+});
 
 // AUTH: REGISTRAZIONE
 app.post('/api/register', async (req, res) => {
@@ -304,7 +335,7 @@ app.get('/api/users/find', verificaToken, async (req, res) => {
         // Prima cercava match esatto (=). Ora cerca parziale (LIKE %...%)
         const users = await db('utenti')
             .select('id_utente', 'nome_pg', 'avatar_chat')
-            .where('nome_pg', 'ilike', `${name}%`) // 'ilike' è case-insensitive per Postgres. Se usi SQLite usa 'like'
+            .whereRaw('LOWER(nome_pg) LIKE LOWER(?)', [`${name}%`])
             .andWhere('id_utente', '!=', myId)
             .limit(5); // Limitiamo a 5 suggerimenti
 
@@ -1896,7 +1927,7 @@ io.on('connection', async (socket) => {
 // --- 5. AVVIO SERVER ---
 (async () => {
     try {
-        await db.raw('SELECT 1+1 as result');
+        await db.raw('SELECT 1');
         console.log(`✅ Connessione al database (${environment}) riuscita.`);
         httpServer.listen(port, () => {
             console.log(`🚀 Server avviato su http://localhost:${port} in modalità ${environment}`);
