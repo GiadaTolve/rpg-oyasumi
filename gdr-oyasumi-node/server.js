@@ -697,16 +697,15 @@ app.get('/api/admin/banners', verificaToken, verificaMod, async (req, res) => {
     try {
         const banners = await db('event_banners')
             .select('*')
-            .orderBy('created_at', 'desc');
+            .orderBy('id', 'desc'); // 🔒 niente created_at
 
-        // 🔒 SEMPRE array, mai 204
         res.status(200).json(Array.isArray(banners) ? banners : []);
-
     } catch (error) {
-        console.error("Errore GET admin banners:", error);
+        console.error("❌ Errore GET admin banners:", error);
         res.status(500).json({ message: "Errore recupero banners." });
     }
 });
+
 
 // POST — Crea nuovo banner
 app.post('/api/admin/banners', verificaToken, verificaMod, async (req, res) => {
