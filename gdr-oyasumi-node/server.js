@@ -882,6 +882,143 @@ app.delete('/api/admin/locations/:id', verificaToken, verificaAdmin, async (req,
     }
 });
 
+// =====================================================
+// --- ADMIN FORUM ---
+// =====================================================
+
+app.get('/api/admin/forum/sezioni', verificaToken, verificaMod, async (req, res) => {
+    try {
+        const sezioni = await db('forum_sezioni')
+            .orderBy('ordine', 'asc');
+        res.json(sezioni);
+    } catch (e) {
+        console.error("Errore get sezioni:", e);
+        res.status(500).json({ message: "Errore recupero sezioni." });
+    }
+});
+
+app.post('/api/admin/forum/sezioni', verificaToken, verificaMod, async (req, res) => {
+    const { titolo, descrizione, ordine } = req.body;
+
+    try {
+        await db('forum_sezioni').insert({
+            titolo,
+            descrizione,
+            ordine: ordine ?? 0
+        });
+        res.status(201).json({ message: "Sezione creata." });
+    } catch (e) {
+        console.error("Errore crea sezione:", e);
+        res.status(500).json({ message: "Errore creazione sezione." });
+    }
+});
+
+app.put('/api/admin/forum/sezioni/:id', verificaToken, verificaMod, async (req, res) => {
+    try {
+        await db('forum_sezioni')
+            .where({ id: req.params.id })
+            .update(req.body);
+        res.json({ message: "Sezione aggiornata." });
+    } catch (e) {
+        console.error("Errore update sezione:", e);
+        res.status(500).json({ message: "Errore aggiornamento sezione." });
+    }
+});
+
+app.delete('/api/admin/forum/sezioni/:id', verificaToken, verificaAdmin, async (req, res) => {
+    try {
+        await db('forum_sezioni').where({ id: req.params.id }).del();
+        res.json({ message: "Sezione eliminata." });
+    } catch (e) {
+        console.error("Errore delete sezione:", e);
+        res.status(500).json({ message: "Errore eliminazione sezione." });
+    }
+});
+
+app.get('/api/admin/forum/bacheche', verificaToken, verificaMod, async (req, res) => {
+    try {
+        const bacheche = await db('forum_bacheche')
+            .orderBy('ordine', 'asc');
+        res.json(bacheche);
+    } catch (e) {
+        console.error("Errore get bacheche:", e);
+        res.status(500).json({ message: "Errore recupero bacheche." });
+    }
+});
+
+app.post('/api/admin/forum/bacheche', verificaToken, verificaMod, async (req, res) => {
+    const { sezione_id, titolo, descrizione, ordine } = req.body;
+
+    try {
+        await db('forum_bacheche').insert({
+            sezione_id,
+            titolo,
+            descrizione,
+            ordine: ordine ?? 0
+        });
+        res.status(201).json({ message: "Bacheca creata." });
+    } catch (e) {
+        console.error("Errore crea bacheca:", e);
+        res.status(500).json({ message: "Errore creazione bacheca." });
+    }
+});
+
+app.put('/api/admin/forum/bacheche/:id', verificaToken, verificaMod, async (req, res) => {
+    try {
+        await db('forum_bacheche')
+            .where({ id: req.params.id })
+            .update(req.body);
+        res.json({ message: "Bacheca aggiornata." });
+    } catch (e) {
+        console.error("Errore update bacheca:", e);
+        res.status(500).json({ message: "Errore aggiornamento bacheca." });
+    }
+});
+
+app.delete('/api/admin/forum/bacheche/:id', verificaToken, verificaAdmin, async (req, res) => {
+    try {
+        await db('forum_bacheche').where({ id: req.params.id }).del();
+        res.json({ message: "Bacheca eliminata." });
+    } catch (e) {
+        console.error("Errore delete bacheca:", e);
+        res.status(500).json({ message: "Errore eliminazione bacheca." });
+    }
+});
+
+app.get('/api/admin/forum/topics', verificaToken, verificaMod, async (req, res) => {
+    try {
+        const topics = await db('forum_topics')
+            .orderBy('ultimo_post_timestamp', 'desc');
+        res.json(topics);
+    } catch (e) {
+        console.error("Errore get topics admin:", e);
+        res.status(500).json({ message: "Errore recupero topics." });
+    }
+});
+
+app.delete('/api/admin/forum/topics/:id', verificaToken, verificaMod, async (req, res) => {
+    try {
+        await db.transaction(async (trx) => {
+            await trx('forum_posts').where({ topic_id: req.params.id }).del();
+            await trx('forum_topics').where({ id: req.params.id }).del();
+        });
+        res.json({ message: "Topic eliminato." });
+    } catch (e) {
+        console.error("Errore delete topic:", e);
+        res.status(500).json({ message: "Errore eliminazione topic." });
+    }
+});
+
+app.delete('/api/admin/forum/posts/:id', verificaToken, verificaMod, async (req, res) => {
+    try {
+        await db('forum_posts').where({ id: req.params.id }).del();
+        res.json({ message: "Post eliminato." });
+    } catch (e) {
+        console.error("Errore delete post:", e);
+        res.status(500).json({ message: "Errore eliminazione post." });
+    }
+});
+
 
 
 // MAPPE DI GIOCO
