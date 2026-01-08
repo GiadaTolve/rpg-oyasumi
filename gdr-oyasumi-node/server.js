@@ -1238,6 +1238,18 @@ app.get('/api/forum/topic/:topicId', verificaToken, async (req, res) => {
             .select('p.*', 'u.nome_pg as autore_nome', 'u.permesso as autore_permesso', db.raw("COALESCE(u.avatar_chat, '/icone/mini_avatar.png') as autore_avatar_url"), db.raw('EXISTS(SELECT 1 FROM forum_post_likes WHERE post_id = p.id AND user_id = ?) as user_has_liked', [userId]))
             .where('p.topic_id', topicId).orderBy('p.timestamp_creazione', 'asc');
         
+            await db('forum_topic_reads')
+    .insert({
+        user_id: userId,
+        topic_id: topicId,
+        last_read_timestamp: db.fn.now()
+    })
+    .onConflict(['user_id', 'topic_id'])
+    .merge({
+        last_read_timestamp: db.fn.now()
+    });
+
+
         res.json({ ...topic, posts });
     } catch (error) { res.status(500).json({ message: "Errore." }); }
 });
@@ -1267,6 +1279,7 @@ app.post('/api/forum/posts', verificaToken, async (req, res) => {
         res.status(201).json({ message: 'Risposta inviata!' });
     } catch (e) { res.status(500).json({ message: "Errore." }); }
 });
+
 
 // [POST] SEGNA INTERA BACHECA COME LETTA
 app.post('/api/forum/mark-all-as-read', verificaToken, async (req, res) => {
@@ -1302,6 +1315,36 @@ app.post('/api/forum/mark-all-as-read', verificaToken, async (req, res) => {
     }
 });
 
+// ==================================================
+// ❤️ TOGGLE LIKE POST (PERSISTENTE)
+// ==================================================
+app.post('/api/forum/posts/:postId/like', verificaToken, async (req, res) => {
+    const { postId } = req.params;
+    const userId = req.utente.id;
+
+    try {
+        const existing = await db('forum_post_likes')
+            .where({ post_id: postId, user_id: userId })
+            .first();
+
+        if (existing) {
+            await db('forum_post_likes')
+                .where({ post_id: postId, user_id: userId })
+                .del();
+
+            return res.json({ liked: false });
+        }
+
+        await db('forum_post_likes')
+            .insert({ post_id: postId, user_id: userId });
+
+        res.json({ liked: true });
+
+    } catch (error) {
+        console.error("Errore toggle like:", error);
+        res.status(500).json({ message: "Errore gestione like." });
+    }
+});
 
 
 // =================================================================
