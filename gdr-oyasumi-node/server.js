@@ -687,6 +687,7 @@ app.put('/api/admin/users/:id', verificaToken, verificaAdmin, async (req, res) =
         res.status(500).json({ message: "Errore interno durante la modifica." });
     }
 });
+
 // =====================================================
 // --- BLOCCO 1: ADMIN BANNERS (CRUD COMPLETO) ---
 // =====================================================
@@ -698,7 +699,9 @@ app.get('/api/admin/banners', verificaToken, verificaMod, async (req, res) => {
             .select('*')
             .orderBy('created_at', 'desc');
 
-        res.json(banners);
+        // 🔒 SEMPRE array, mai 204
+        res.status(200).json(Array.isArray(banners) ? banners : []);
+
     } catch (error) {
         console.error("Errore GET admin banners:", error);
         res.status(500).json({ message: "Errore recupero banners." });
