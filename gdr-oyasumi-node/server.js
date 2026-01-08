@@ -785,6 +785,104 @@ app.delete('/api/admin/banners/:id', verificaToken, verificaMod, async (req, res
     }
 });
 
+// =====================================================
+// --- ADMIN MAPPE ---
+// =====================================================
+
+app.get('/api/admin/locations', verificaToken, verificaMod, async (req, res) => {
+    try {
+        const locations = await db('locations')
+            .select('*')
+            .orderBy('id', 'asc'); // 🔒 sicuro
+
+        res.json(locations);
+    } catch (error) {
+        console.error("❌ Errore GET admin locations:", error);
+        res.status(500).json({ message: "Errore recupero locations." });
+    }
+});
+
+app.post('/api/admin/locations', verificaToken, verificaMod, async (req, res) => {
+    const {
+        name,
+        type,
+        parent_id,
+        image_url,
+        description,
+        pos_x,
+        pos_y,
+        prefecture
+    } = req.body;
+
+    try {
+        const [idResult] = await db('locations')
+            .insert({
+                name,
+                type,                 // 'MAP' o 'CHAT'
+                parent_id: parent_id ?? null,
+                image_url: image_url ?? null,
+                description: description ?? null,
+                pos_x: pos_x ?? null,
+                pos_y: pos_y ?? null,
+                prefecture: prefecture ?? null
+            })
+            .returning('id');
+
+        const newId = typeof idResult === 'object' ? idResult.id : idResult;
+
+        res.status(201).json({ id: newId });
+    } catch (error) {
+        console.error("❌ Errore CREATE location:", error);
+        res.status(500).json({ message: "Errore creazione location." });
+    }
+});
+
+app.put('/api/admin/locations/:id', verificaToken, verificaMod, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        await db('locations')
+            .where({ id })
+            .update(req.body);
+
+        res.json({ message: "Location aggiornata." });
+    } catch (error) {
+        console.error("❌ Errore UPDATE location:", error);
+        res.status(500).json({ message: "Errore aggiornamento location." });
+    }
+});
+
+app.put('/api/admin/locations/:id/parent', verificaToken, verificaMod, async (req, res) => {
+    const { id } = req.params;
+    const { newParentId } = req.body;
+
+    try {
+        await db('locations')
+            .where({ id })
+            .update({
+                parent_id: newParentId ?? null
+            });
+
+        res.json({ message: "Parent aggiornato." });
+    } catch (error) {
+        console.error("❌ Errore cambio parent:", error);
+        res.status(500).json({ message: "Errore spostamento location." });
+    }
+});
+
+app.delete('/api/admin/locations/:id', verificaToken, verificaAdmin, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        await db('locations').where({ id }).del();
+        res.json({ message: "Location eliminata." });
+    } catch (error) {
+        console.error("❌ Errore DELETE location:", error);
+        res.status(500).json({ message: "Errore eliminazione location." });
+    }
+});
+
+
 
 // MAPPE DI GIOCO
 app.get('/api/game/map/:mapId', verificaToken, async (req, res) => {
