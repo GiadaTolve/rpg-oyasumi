@@ -687,6 +687,101 @@ app.put('/api/admin/users/:id', verificaToken, verificaAdmin, async (req, res) =
         res.status(500).json({ message: "Errore interno durante la modifica." });
     }
 });
+// =====================================================
+// --- BLOCCO 1: ADMIN BANNERS (CRUD COMPLETO) ---
+// =====================================================
+
+// GET — Lista banner (pannello gestione)
+app.get('/api/admin/banners', verificaToken, verificaMod, async (req, res) => {
+    try {
+        const banners = await db('event_banners')
+            .select('*')
+            .orderBy('created_at', 'desc');
+
+        res.json(banners);
+    } catch (error) {
+        console.error("Errore GET admin banners:", error);
+        res.status(500).json({ message: "Errore recupero banners." });
+    }
+});
+
+// POST — Crea nuovo banner
+app.post('/api/admin/banners', verificaToken, verificaMod, async (req, res) => {
+    const { title, image_url, link_url, is_active } = req.body;
+
+    try {
+        await db.transaction(async (trx) => {
+
+            // 👉 Se il nuovo banner è attivo, disattiviamo tutti gli altri
+            if (is_active) {
+                await trx('event_banners').update({ is_active: 0 });
+            }
+
+            await trx('event_banners').insert({
+                title,
+                image_url,
+                link_url,
+                is_active: is_active ? 1 : 0
+            });
+        });
+
+        res.json({ message: "Banner creato con successo." });
+
+    } catch (error) {
+        console.error("Errore POST admin banner:", error);
+        res.status(500).json({ message: "Errore creazione banner." });
+    }
+});
+
+// PUT — Modifica banner
+app.put('/api/admin/banners/:id', verificaToken, verificaMod, async (req, res) => {
+    const { id } = req.params;
+    const { title, image_url, link_url, is_active } = req.body;
+
+    try {
+        await db.transaction(async (trx) => {
+
+            // 👉 Se lo stiamo attivando, spegniamo gli altri
+            if (is_active) {
+                await trx('event_banners')
+                    .whereNot('id', id)
+                    .update({ is_active: 0 });
+            }
+
+            await trx('event_banners')
+                .where({ id })
+                .update({
+                    title,
+                    image_url,
+                    link_url,
+                    is_active: is_active ? 1 : 0
+                });
+        });
+
+        res.json({ message: "Banner aggiornato." });
+
+    } catch (error) {
+        console.error("Errore PUT admin banner:", error);
+        res.status(500).json({ message: "Errore aggiornamento banner." });
+    }
+});
+
+// DELETE — Elimina banner
+app.delete('/api/admin/banners/:id', verificaToken, verificaMod, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        await db('event_banners')
+            .where({ id })
+            .del();
+
+        res.json({ message: "Banner eliminato." });
+
+    } catch (error) {
+        console.error("Errore DELETE admin banner:", error);
+        res.status(500).json({ message: "Errore eliminazione banner." });
+    }
+});
 
 
 // MAPPE DI GIOCO
