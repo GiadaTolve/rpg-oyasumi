@@ -1315,37 +1315,42 @@ app.post('/api/forum/mark-all-as-read', verificaToken, async (req, res) => {
     }
 });
 
-// ==================================================
-// ❤️ TOGGLE LIKE POST (PERSISTENTE)
-// ==================================================
+// ==============================
+// ❤️ TOGGLE LIKE POST FORUM
+// ==============================
 app.post('/api/forum/posts/:postId/like', verificaToken, async (req, res) => {
-    const { postId } = req.params;
+    const postId = Number(req.params.postId);
     const userId = req.utente.id;
 
+    if (!postId) {
+        return res.status(400).json({ message: "Post non valido." });
+    }
+
     try {
-        const existing = await db('forum_post_likes')
+        const existingLike = await db('forum_post_likes')
             .where({ post_id: postId, user_id: userId })
             .first();
 
-        if (existing) {
+        if (existingLike) {
+            // 🔻 UNLIKE
             await db('forum_post_likes')
                 .where({ post_id: postId, user_id: userId })
                 .del();
 
             return res.json({ liked: false });
+        } else {
+            // 🔺 LIKE
+            await db('forum_post_likes')
+                .insert({ post_id: postId, user_id: userId });
+
+            return res.json({ liked: true });
         }
-
-        await db('forum_post_likes')
-            .insert({ post_id: postId, user_id: userId });
-
-        res.json({ liked: true });
 
     } catch (error) {
         console.error("Errore toggle like:", error);
         res.status(500).json({ message: "Errore gestione like." });
     }
 });
-
 
 // =================================================================
 // --- HOUSING SYSTEM ---
