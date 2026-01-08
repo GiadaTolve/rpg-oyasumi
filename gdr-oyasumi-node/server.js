@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 // --- 1. IMPORT E IMPOSTAZIONI GLOBALI ---
 const express = require('express');
 const http = require('http');
@@ -12,38 +14,44 @@ const axios = require('axios');
 const knex = require('knex');
 const knexConfig = require('./knexfile');
 
-console.log("✅ FASE 1: Tutti i moduli sono stati importati.");
-
-require('dotenv').config();
-
-// Seleziona l'ambiente (development o production)
 const environment = process.env.NODE_ENV || 'development';
-// Inizializza il database usando Knex e il file di configurazione
+
+if (!knexConfig[environment]) {
+    throw new Error(`Configurazione Knex mancante per ambiente: ${environment}`);
+}
+
 const db = knex(knexConfig[environment]);
+
 const app = express();
 
-const port = process.env.PORT || 3000;
-const httpServer = http.createServer(app);
 
+const port = process.env.PORT || 3000;
 const allowedOrigins = [
     "http://localhost:5173", // Per lo sviluppo in locale
     process.env.FRONTEND_URL // Per la produzione
 ].filter(Boolean);
 
+const httpServer = http.createServer(app);
+
+
 const corsOptions = {
     origin: function (origin, callback) {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.indexOf(origin) === -1) {
-        const msg = 'La policy CORS non permette l\'accesso da questa origine.';
-        return callback(new Error(msg), false);
-      }
-      return callback(null, true);
-    }
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            return callback(new Error('CORS bloccato'), false);
+        }
+        return callback(null, true);
+    },
+    credentials: true
 };
 
 const io = new Server(httpServer, {
-    cors: corsOptions
+    cors: {
+        origin: allowedOrigins,
+        credentials: true
+    }
 });
+
 
 let onlineUsers = {};
 let userSockets = new Map();
@@ -102,25 +110,43 @@ const checkRentDue = async (userId) => {
 
 // --- 2. MIDDLEWARE ---
 app.use(cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+app.set('db', db);
+app.set('io', io);
+
 // --- PERMESSI MIDDLEWARE ---
+
+const requireAuth = (req, res, next) => {
+    if (!req.utente) {
+        return res.status(401).json({ message: 'Non autenticato.' });
+    }
+    next();
+};
+
 const verificaAdmin = (req, res, next) => {
-    if (req.utente?.permesso === 'ADMIN') next();
-    else res.status(403).json({ message: 'Accesso negato: richiesti permessi di Admin.' });
+    if (!req.utente) {
+        return res.status(401).json({ message: 'Non autenticato.' });
+    }
+    if (req.utente.permesso === 'ADMIN') return next();
+    return res.status(403).json({ message: 'Accesso negato: Admin richiesto.' });
 };
-  
-const verificaMaster = (req, res, next) => {
-    const permessiValidi = ['MASTER', 'MOD', 'ADMIN'];
-    if (permessiValidi.includes(req.utente?.permesso)) next();
-    else res.status(403).json({ message: 'Accesso negato: richiesti permessi di Master o superiori.' });
-};
-  
+
 const verificaMod = (req, res, next) => {
-    const permessiValidi = ['MOD', 'ADMIN'];
-    if (permessiValidi.includes(req.utente?.permesso)) next();
-    else res.status(403).json({ message: 'Accesso negato: richiesti permessi di Moderatore o superiori.' });
+    if (!req.utente) {
+        return res.status(401).json({ message: 'Non autenticato.' });
+    }
+    if (['MOD', 'ADMIN'].includes(req.utente.permesso)) return next();
+    return res.status(403).json({ message: 'Accesso negato: Moderatore richiesto.' });
+};
+
+const verificaMaster = (req, res, next) => {
+    if (!req.utente) {
+        return res.status(401).json({ message: 'Non autenticato.' });
+    }
+    if (['MASTER', 'MOD', 'ADMIN'].includes(req.utente.permesso)) return next();
+    return res.status(403).json({ message: 'Accesso negato: Master richiesto.' });
 };
 
 // --- 3. API ROUTES ---
