@@ -1190,7 +1190,6 @@ app.get('/api/forum', verificaToken, async (req, res) => {
             .select([
                 'b.*',
                 db.raw('(SELECT COUNT(t.id) FROM forum_topics t WHERE t.bacheca_id = b.id) as topic_count'),
-                db.raw('(SELECT COUNT(*) FROM forum_post_likes WHERE post_id = p.id) as like_count'),
                 db.raw('(SELECT t.ultimo_post_timestamp FROM forum_topics t WHERE t.bacheca_id = b.id ORDER BY t.ultimo_post_timestamp DESC LIMIT 1) as last_post_timestamp'),
                 db.raw('(SELECT u.nome_pg FROM forum_topics t JOIN forum_posts p ON p.topic_id = t.id JOIN utenti u ON u.id_utente = p.autore_id WHERE t.bacheca_id = b.id ORDER BY p.timestamp_creazione DESC LIMIT 1) as last_post_author'),
                 db.raw(`
@@ -2463,11 +2462,12 @@ const path = require('path');
 app.use(express.static(path.join(__dirname, '../gdr-frontend/dist')));
 
 // catch-all: qualsiasi rotta non-API va a React
-app.get('*', (req, res) => {
+app.get(/^(?!\/api).*/, (req, res) => {
     res.sendFile(
         path.join(__dirname, '../gdr-frontend/dist/index.html')
     );
 });
+
 
 
 
