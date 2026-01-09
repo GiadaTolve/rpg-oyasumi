@@ -1193,7 +1193,24 @@ app.get('/api/forum', verificaToken, async (req, res) => {
                 db.raw('(SELECT COUNT(*) FROM forum_post_likes WHERE post_id = p.id) as like_count'),
                 db.raw('(SELECT t.ultimo_post_timestamp FROM forum_topics t WHERE t.bacheca_id = b.id ORDER BY t.ultimo_post_timestamp DESC LIMIT 1) as last_post_timestamp'),
                 db.raw('(SELECT u.nome_pg FROM forum_topics t JOIN forum_posts p ON p.topic_id = t.id JOIN utenti u ON u.id_utente = p.autore_id WHERE t.bacheca_id = b.id ORDER BY p.timestamp_creazione DESC LIMIT 1) as last_post_author'),
-                db.raw(`EXISTS (SELECT 1 FROM forum_topics t WHERE t.bacheca_id = b.id AND (t.ultimo_post_timestamp > COALESCE((SELECT r.last_read_timestamp FROM forum_topic_reads r WHERE r.topic_id = t.id AND r.user_id = ?), '1970-01-01'))) as has_new_posts`, [userId])
+                db.raw(`
+                    EXISTS (
+                      SELECT 1
+                      FROM forum_topics t
+                      WHERE t.bacheca_id = b.id
+                      AND (
+                        t.ultimo_post_timestamp >
+                        COALESCE(
+                          (SELECT r.last_read_timestamp
+                           FROM forum_topic_reads r
+                           WHERE r.topic_id = t.id
+                           AND r.user_id = ?),
+                          TIMESTAMP '1970-01-01 00:00:00'
+                        )
+                      )
+                    ) as has_new_posts
+                    `, [userId])
+                    
             ])
             .orderBy('b.ordine', 'asc');
 
