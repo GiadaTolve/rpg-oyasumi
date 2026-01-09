@@ -1190,6 +1190,7 @@ app.get('/api/forum', verificaToken, async (req, res) => {
             .select([
                 'b.*',
                 db.raw('(SELECT COUNT(t.id) FROM forum_topics t WHERE t.bacheca_id = b.id) as topic_count'),
+                db.raw('(SELECT COUNT(*) FROM forum_post_likes WHERE post_id = p.id) as like_count'),
                 db.raw('(SELECT t.ultimo_post_timestamp FROM forum_topics t WHERE t.bacheca_id = b.id ORDER BY t.ultimo_post_timestamp DESC LIMIT 1) as last_post_timestamp'),
                 db.raw('(SELECT u.nome_pg FROM forum_topics t JOIN forum_posts p ON p.topic_id = t.id JOIN utenti u ON u.id_utente = p.autore_id WHERE t.bacheca_id = b.id ORDER BY p.timestamp_creazione DESC LIMIT 1) as last_post_author'),
                 db.raw(`EXISTS (SELECT 1 FROM forum_topics t WHERE t.bacheca_id = b.id AND (t.ultimo_post_timestamp > COALESCE((SELECT r.last_read_timestamp FROM forum_topic_reads r WHERE r.topic_id = t.id AND r.user_id = ?), '1970-01-01'))) as has_new_posts`, [userId])
@@ -1234,9 +1235,23 @@ app.get('/api/forum/topic/:topicId', verificaToken, async (req, res) => {
         if (!topic) return res.status(404).json({ message: 'Discussione non trovata.' });
 
         const posts = await db('forum_posts as p')
-            .join('utenti as u', 'p.autore_id', 'u.id_utente')
-            .select('p.*', 'u.nome_pg as autore_nome', 'u.permesso as autore_permesso', db.raw("COALESCE(u.avatar_chat, '/icone/mini_avatar.png') as autore_avatar_url"), db.raw('EXISTS(SELECT 1 FROM forum_post_likes WHERE post_id = p.id AND user_id = ?) as user_has_liked', [userId]))
-            .where('p.topic_id', topicId).orderBy('p.timestamp_creazione', 'asc');
+    .join('utenti as u', 'p.autore_id', 'u.id_utente')
+    .select(
+        'p.*',
+        'u.nome_pg as autore_nome',
+        'u.permesso as autore_permesso',
+        db.raw("COALESCE(u.avatar_chat, '/icone/mini_avatar.png') as autore_avatar_url"),
+        db.raw(
+            'EXISTS(SELECT 1 FROM forum_post_likes WHERE post_id = p.id AND user_id = ?) as user_has_liked',
+            [userId]
+        ),
+        db.raw(
+            '(SELECT COUNT(*) FROM forum_post_likes WHERE post_id = p.id) as like_count'
+        )
+    )
+    .where('p.topic_id', topicId)
+    .orderBy('p.timestamp_creazione', 'asc');
+
         
             await db('forum_topic_reads')
     .insert({
