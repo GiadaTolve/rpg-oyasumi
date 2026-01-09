@@ -2454,6 +2454,21 @@ io.on('connection', async (socket) => {
     }
 });
 
+// ===============================
+// SERVE FRONTEND REACT (RENDER)
+// ===============================
+const path = require('path');
+
+// path alla build di Vite
+app.use(express.static(path.join(__dirname, '../gdr-frontend/dist')));
+
+// catch-all: qualsiasi rotta non-API va a React
+app.get('*', (req, res) => {
+    res.sendFile(
+        path.join(__dirname, '../gdr-frontend/dist/index.html')
+    );
+});
+
 
 
 // --- 5. AVVIO SERVER ---
