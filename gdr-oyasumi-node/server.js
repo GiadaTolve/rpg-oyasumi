@@ -924,8 +924,6 @@ app.delete('/api/admin/locations/:id', verificaToken, verificaAdmin, async (req,
 
 app.get('/api/admin/forum/sezioni', verificaToken, verificaMod, async (req, res) => {
     try {
-        const sezioni = await db('forum_sezioni')
-            .orderBy('ordine', 'asc');
         res.json(sezioni);
     } catch (e) {
         console.error("Errore get sezioni:", e);
