@@ -137,7 +137,7 @@ function Forum() {
     const fetchForum = async () => {
       try {
         setLoading(true);
-        const response = await api.get('/api/forum'); 
+        const response = await api.get('/forum'); 
         setForumData(response.data);
       } catch (err) {
         console.error("Errore caricamento forum:", err);
