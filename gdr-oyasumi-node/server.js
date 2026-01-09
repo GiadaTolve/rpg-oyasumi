@@ -1226,9 +1226,15 @@ app.get('/api/forum', verificaToken, async (req, res) => {
       res.json(forumData);
   
     } catch (error) {
-      console.error("❌ ERRORE /api/forum:", error);
-      res.status(500).json({ message: "Errore interno." });
-    }
+        console.error("❌ ERRORE /api/forum:");
+        console.error(error.message);
+        console.error(error.stack);
+        res.status(500).json({
+          message: "Errore interno forum",
+          error: error.message
+        });
+      }
+      
   });
   
 
