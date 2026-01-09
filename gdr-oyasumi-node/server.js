@@ -1185,8 +1185,10 @@ app.post('/api/quests', verificaToken, verificaMaster, async (req, res) => {
 app.get('/api/forum', verificaToken, async (req, res) => {
     try {
         const { id: userId } = req.utente;
-        const sezioni = await db('forum_sezioni').orderBy('ordine', 'asc');
-        const bacheche = await db('forum_bacheche as b')
+        const sezioni = await db('forum_sezioni')
+        .select('id', 'titolo as nome', 'descrizione', 'ordine')
+        .orderBy('ordine', 'asc');
+              const bacheche = await db('forum_bacheche as b')
             .select([
                 'b.*',
                 db.raw('(SELECT COUNT(t.id) FROM forum_topics t WHERE t.bacheca_id = b.id) as topic_count'),
