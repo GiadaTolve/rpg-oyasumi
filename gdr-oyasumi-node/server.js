@@ -1257,7 +1257,7 @@ app.get('/api/forum', verificaToken, async (req, res) => {
   });
 
   
-  
+
 
 app.get('/api/forum/bacheca/:bachecaId/topics', verificaToken, async (req, res) => {
     try {
@@ -1292,6 +1292,9 @@ app.get('/api/forum/topic/:topicId', verificaToken, async (req, res) => {
         'u.nome_pg as autore_nome',
         'u.permesso as autore_permesso',
         db.raw("COALESCE(u.avatar_chat, '/icone/mini_avatar.png') as autore_avatar_url"),
+        db.raw(
+            '(SELECT COUNT(*) FROM forum_post_likes WHERE post_id = p.id) as like_count'
+          ),          
         db.raw(
             'EXISTS(SELECT 1 FROM forum_post_likes WHERE post_id = p.id AND user_id = ?) as user_has_liked',
             [userId]
