@@ -1273,9 +1273,6 @@ app.get('/api/forum/topic/:topicId', verificaToken, async (req, res) => {
             'EXISTS(SELECT 1 FROM forum_post_likes WHERE post_id = p.id AND user_id = ?) as user_has_liked',
             [userId]
         ),
-        db.raw(
-            '(SELECT COUNT(*) FROM forum_post_likes WHERE post_id = p.id) as like_count'
-        )
     )
     .where('p.topic_id', topicId)
     .orderBy('p.timestamp_creazione', 'asc');
