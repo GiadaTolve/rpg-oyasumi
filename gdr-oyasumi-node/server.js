@@ -1206,19 +1206,15 @@ app.get('/api/forum', verificaToken, async (req, res) => {
             EXISTS (
               SELECT 1
               FROM forum_topics t
+              LEFT JOIN forum_topic_reads r
+                ON r.topic_id = t.id
+                AND r.user_id = ?
               WHERE t.bacheca_id = b.id
-              AND (
-                t.ultimo_post_timestamp >
-                COALESCE(
-                  (SELECT r.last_read_timestamp
-                   FROM forum_topic_reads r
-                   WHERE r.topic_id = t.id
-                   AND r.user_id = ?),
-                  TIMESTAMP '1970-01-01 00:00:00'
-                )
-              )
-            ) as has_new_posts
+                AND t.ultimo_post_timestamp >
+                    COALESCE(r.last_read_timestamp, TIMESTAMP '1970-01-01')
+            ) AS has_new_posts
           `, [userId])
+          
         ])
         .orderBy('b.ordine', 'asc');
   
