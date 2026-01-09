@@ -1182,42 +1182,64 @@ app.post('/api/quests', verificaToken, verificaMaster, async (req, res) => {
 
 app.get('/api/forum', verificaToken, async (req, res) => {
     try {
-      const { id: userId } = req.utente;
+      const userId = req.utente.id;
   
+      // 1. SEZIONI
       const sezioni = await db('forum_sezioni')
-        .select('id', 'titolo as nome', 'descrizione', 'ordine')
+        .select('id', 'nome', 'descrizione', 'ordine')
         .orderBy('ordine', 'asc');
   
+      // 2. BACHECHE + METADATI
       const bacheche = await db('forum_bacheche as b')
-        .select([
-          'b.*',
-          db.raw('(SELECT COUNT(t.id) FROM forum_topics t WHERE t.bacheca_id = b.id) as topic_count'),
-          db.raw('(SELECT t.ultimo_post_timestamp FROM forum_topics t WHERE t.bacheca_id = b.id ORDER BY t.ultimo_post_timestamp DESC LIMIT 1) as last_post_timestamp'),
-          db.raw(`
-            (SELECT u.nome_pg
-             FROM forum_topics t
-             JOIN forum_posts p ON p.topic_id = t.id
-             JOIN utenti u ON u.id_utente = p.autore_id
-             WHERE t.bacheca_id = b.id
-             ORDER BY p.timestamp_creazione DESC
-             LIMIT 1) as last_post_author
-          `),
-          db.raw(`
-            EXISTS (
-              SELECT 1
+        .select(
+          'b.id',
+          'b.sezione_id',
+          'b.nome',
+          'b.descrizione',
+          'b.ordine',
+          'b.is_locked',
+  
+          // numero topic
+          db.raw(
+            '(SELECT COUNT(*) FROM forum_topics t WHERE t.bacheca_id = b.id) AS topic_count'
+          ),
+  
+          // timestamp ultimo post
+          db.raw(
+            `(SELECT MAX(ultimo_post_timestamp)
               FROM forum_topics t
-              LEFT JOIN forum_topic_reads r
-                ON r.topic_id = t.id
-                AND r.user_id = ?
+              WHERE t.bacheca_id = b.id) AS last_post_timestamp`
+          ),
+  
+          // autore ultimo post
+          db.raw(
+            `(SELECT u.nome_pg
+              FROM forum_topics t
+              JOIN forum_posts p ON p.topic_id = t.id
+              JOIN utenti u ON u.id_utente = p.autore_id
               WHERE t.bacheca_id = b.id
-                AND t.ultimo_post_timestamp >
-                    COALESCE(r.last_read_timestamp, TIMESTAMP '1970-01-01')
-            ) AS has_new_posts
-          `, [userId])
-          
-        ])
+              ORDER BY p.timestamp_creazione DESC
+              LIMIT 1) AS last_post_author`
+          ),
+  
+          // nuovi messaggi?
+          db.raw(
+            `(SELECT EXISTS (
+                SELECT 1
+                FROM forum_topics t
+                LEFT JOIN forum_topic_reads r
+                  ON r.topic_id = t.id
+                 AND r.user_id = ?
+                WHERE t.bacheca_id = b.id
+                  AND t.ultimo_post_timestamp >
+                      COALESCE(r.last_read_timestamp, TIMESTAMP '1970-01-01')
+            )) AS has_new_posts`,
+            [userId]
+          )
+        )
         .orderBy('b.ordine', 'asc');
   
+      // 3. STRUTTURA GERARCHICA
       const forumData = sezioni.map(sezione => ({
         ...sezione,
         bacheche: bacheche.filter(b => b.sezione_id === sezione.id)
@@ -1226,16 +1248,15 @@ app.get('/api/forum', verificaToken, async (req, res) => {
       res.json(forumData);
   
     } catch (error) {
-        console.error("❌ ERRORE /api/forum:");
-        console.error(error.message);
-        console.error(error.stack);
-        res.status(500).json({
-          message: "Errore interno forum",
-          error: error.message
-        });
-      }
-      
+      console.error('❌ ERRORE /api/forum:', error.message);
+      res.status(500).json({
+        message: 'Errore interno forum',
+        error: error.message
+      });
+    }
   });
+
+  
   
 
 app.get('/api/forum/bacheca/:bachecaId/topics', verificaToken, async (req, res) => {
