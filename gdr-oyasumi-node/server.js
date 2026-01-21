@@ -1293,7 +1293,7 @@ app.get('/api/forum/topic/:topicId', verificaToken, async (req, res) => {
         'u.permesso as autore_permesso',
         db.raw("COALESCE(u.avatar_chat, '/icone/mini_avatar.png') as autore_avatar_url"),
         db.raw(
-            '(SELECT COUNT(*) FROM forum_post_likes WHERE post_id = p.id) as like_count'
+'(SELECT COUNT(*)::int FROM forum_post_likes WHERE post_id = p.id) as like_count'
           ),          
         db.raw(
             'EXISTS(SELECT 1 FROM forum_post_likes WHERE post_id = p.id AND user_id = ?) as user_has_liked',
