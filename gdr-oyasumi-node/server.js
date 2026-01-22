@@ -697,44 +697,48 @@ app.get('/api/admin/users', verificaToken, verificaMod, async (req, res) => {
     const users = await db('utenti').select('id_utente', 'email', 'nome_pg', 'permesso');
     res.json(users);
 });
-// [PUT] MODIFICA UTENTE DA ADMIN (Nome, Permesso) - ROTTA MANCANTE AGGIUNTA
-app.put('/api/admin/users/:id', verificaToken, async (req, res) => {
-    // Solo ADMIN e MOD possono modificare gli utenti
-    if (!['ADMIN', 'MOD'].includes(req.user.permesso)) {
-        return res.status(403).json({ message: "Accesso negato. Permessi insufficienti." });
-    }
 
+// [PUT] MODIFICA UTENTE DA ADMIN (Nome, Email, Permesso, Password)
+// Usiamo verificaMod perché permette l'accesso sia a MOD che ad ADMIN
+app.put('/api/admin/users/:id', verificaToken, verificaMod, async (req, res) => {
     const { id } = req.params;
     const { nome_pg, email, permesso, password } = req.body;
 
+    console.log(`📡 Richiesta modifica utente ID ${id} da parte di ${req.utente.nome_pg}`);
+
     try {
-        // Prepariamo l'oggetto con i dati da aggiornare
+        // 1. Prepariamo l'oggetto con i dati base
         const updateData = {
             nome_pg,
             email,
             permesso
         };
 
-        // Se è stata fornita una nuova password, dobbiamo criptarla
+        // 2. Se è stata fornita una nuova password, facciamo l'hash
         if (password && password.trim() !== "") {
+            console.log("🔐 Generazione hash per nuova password...");
             const salt = await bcrypt.genSalt(10);
-            const hashedPassword = await bcrypt.hash(password, salt);
-            updateData.password = hashedPassword;
-            console.log(`🔐 Password aggiornata per l'utente ID: ${id}`);
+            updateData.password = await bcrypt.hash(password, salt);
         }
 
+        // 3. Esecuzione aggiornamento sul DB
         const updatedCount = await db('utenti')
             .where({ id_utente: id })
             .update(updateData);
 
         if (updatedCount === 0) {
-            return res.status(404).json({ message: "Utente non trovato." });
+            return res.status(404).json({ message: "Utente non trovato nel database." });
         }
 
-        res.json({ message: "Utente aggiornato con successo!" });
+        console.log(`✅ Utente ID ${id} aggiornato con successo.`);
+        res.json({ message: "Dati utente aggiornati correttamente!" });
+
     } catch (error) {
-        console.error("Errore aggiornamento utente admin:", error);
-        res.status(500).json({ message: "Errore interno del server." });
+        console.error("❌ ERRORE CRITICO AGGIORNAMENTO UTENTE:", error);
+        res.status(500).json({ 
+            message: "Errore interno del server durante il salvataggio.",
+            error: error.message 
+        });
     }
 });
 
