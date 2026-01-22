@@ -2592,6 +2592,7 @@ if (finalPath) {
     app.use((req, res) => res.status(500).send("Errore configurazione: Frontend non trovato."));
 }
 
+
 // --- 5. AVVIO SERVER ---
 (async () => {
     try {
