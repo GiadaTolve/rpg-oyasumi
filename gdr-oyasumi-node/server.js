@@ -2542,17 +2542,19 @@ io.on('connection', async (socket) => {
 // SERVE FRONTEND REACT (RENDER)
 // ===============================
 
-// Middleware per servire i file statici dalla cartella dist
+// 1. Middleware per servire i file statici
 app.use(express.static(path.join(__dirname, '../gdr-frontend/dist')));
 
-// Rotta catch-all: qualsiasi rotta non-API restituisce index.html
-// Questa rotta DEVE essere dopo tutte le rotte /api ma prima dell'avvio del server
-app.get('/*', (req, res) => {
-    res.sendFile(
-        path.join(__dirname, '../gdr-frontend/dist/index.html')
-    );
+// 2. Rotta catch-all compatibile con path-to-regexp v8
+// Usiamo la sintassi 'splat' (*) per catturare tutto senza errori di validazione
+app.get('*', (req, res, next) => {
+    // Se la richiesta inizia con /api, la lasciamo passare alle rotte sopra
+    if (req.path.startsWith('/api')) {
+        return next();
+    }
+    // Per tutto il resto, mandiamo l'index.html
+    res.sendFile(path.join(__dirname, '../gdr-frontend/dist/index.html'));
 });
-
 
 
 
