@@ -2536,45 +2536,52 @@ io.on('connection', async (socket) => {
         console.error("Errore critico socket:", e);
         socket.disconnect();
     }
-});
-
-// =============================================
-// SERVE FRONTEND REACT (RENDER) - FIX FINALE
+});// =============================================
+// SERVE FRONTEND REACT (RENDER) - FIX DEFINITIVO
 // =============================================
 
-// Proviamo a determinare il percorso assoluto della cartella dist
-const frontendPath = path.resolve(__dirname, '../../gdr-frontend/dist'); 
-// Nota: aggiungiamo un ../ in più se necessario o usiamo logica dinamica
-
-const serveFrontend = () => {
+const getFrontendPath = () => {
     const possiblePaths = [
-        path.resolve(__dirname, '../gdr-frontend/dist'),
-        path.resolve(__dirname, '../../gdr-frontend/dist'),
-        path.resolve(process.cwd(), '../gdr-frontend/dist'),
-        path.resolve(process.cwd(), 'gdr-frontend/dist')
+        path.resolve(__dirname, '..', 'gdr-frontend', 'dist'),
+        path.resolve(__dirname, '..', '..', 'gdr-frontend', 'dist'),
+        path.resolve(process.cwd(), 'gdr-frontend', 'dist'),
+        path.resolve(process.cwd(), '..', 'gdr-frontend', 'dist')
     ];
 
     for (let p of possiblePaths) {
         if (require('fs').existsSync(path.join(p, 'index.html'))) {
-            console.log(`✅ Frontend trovato in: ${p}`);
+            console.log(`✅ OYASUMI: Frontend trovato in: ${p}`);
             return p;
         }
     }
-    console.error("❌ ATTENZIONE: index.html non trovato in nessuno dei percorsi mappati!");
+    console.error("❌ OYASUMI: Errore critico! index.html non trovato.");
     return possiblePaths[0];
 };
 
-const finalPath = serveFrontend();
+const finalPath = getFrontendPath();
 
+// 1. Servi i file statici
 app.use(express.static(finalPath));
 
-// Gestione di TUTTE le rotte non-API
+// 2. GESTIONE ROTTE (Compatibile Node 22)
+// Usiamo la stringa '*' invece della Regex che causava il TypeError
 app.get('*', (req, res, next) => {
-    // Se la richiesta inizia con /api, non mandare l'index.html (lascia andare alle rotte API)
-    if (req.path.startsWith('/api')) {
+    // Se la richiesta inizia con /api, la passiamo alle rotte sopra
+    if (req.originalUrl.startsWith('/api')) {
         return next();
     }
-    res.sendFile(path.join(finalPath, 'index.html'));
+    // Per tutte le altre (es: /gestione, /forum), mandiamo l'index.html
+    res.sendFile(path.join(finalPath, 'index.html'), (err) => {
+        if (err) {
+            console.error("❌ Errore sendFile:", err);
+            res.status(500).send("Errore nel caricamento del frontend.");
+        }
+    });
+});
+
+// 3. Fallback per API non esistenti
+app.use('/api', (req, res) => {
+    res.status(404).json({ message: "Endpoint API non trovato." });
 });
 
 // --- 5. AVVIO SERVER ---
@@ -2583,7 +2590,7 @@ app.get('*', (req, res, next) => {
         await db.raw('SELECT 1');
         console.log(`✅ Connessione al database (${environment}) riuscita.`);
         httpServer.listen(port, () => {
-            console.log(`🚀 Server avviato su http://localhost:${port} in modalità ${environment}`);
+            console.log(`🚀 Server avviato su porta ${port} in modalità ${environment}`);
         });
     } catch (errore) {
         console.error("ERRORE CRITICO AVVIO SERVER:", errore);
