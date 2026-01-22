@@ -2542,67 +2542,55 @@ io.on('connection', async (socket) => {
 });
 
 
-// =============================================
-// SERVE FRONTEND REACT (RENDER) - FIX EXPRESS 5 + NODE 22
-// =============================================
+// =================================================================
+// --- FINE ROTTE API ---
+// =================================================================
 
-const getFrontendPath = () => {
-    const possiblePaths = [
-        '/opt/render/project/src/gdr-frontend/dist',
-        path.join(process.cwd(), 'gdr-frontend', 'dist'),
-        path.join(__dirname, '..', 'gdr-frontend', 'dist'),
-        path.join(__dirname, 'dist')
-    ];
+// 1. Definiamo il percorso in modo secco (relativo a questo file)
+// gdr-oyasumi-node/server.js -> sale di uno -> gdr-frontend -> dist
+const frontendDist = path.join(__dirname, '../gdr-frontend/dist');
+const indexFile = path.join(frontendDist, 'index.html');
 
-    for (let p of possiblePaths) {
-        if (require('fs').existsSync(path.join(p, 'index.html'))) {
-            console.log(`✅ OYASUMI: Frontend trovato in: ${p}`);
-            return p;
-        }
+console.log("📂 PERCORSO FRONTEND:", frontendDist);
+
+// 2. Serviamo i file statici (JS, CSS, Immagini)
+app.use(express.static(frontendDist));
+
+// 3. IL "CATCH-ALL" DEFINITIVO (Middleware Finale)
+// Se la richiesta arriva fin qui, significa che non era un'API e non era un file statico.
+// Quindi DEVE essere una pagina del sito (es. /forum, /gestione).
+app.use((req, res) => {
+    // Debug Log: Vediamo cosa sta chiedendo il browser
+    console.log(`🔍 ROUTING: Richiesta non gestita per ${req.url} - Invio index.html`);
+
+    // Se per qualche motivo chiedono un'API che non esiste, diamo 404 JSON
+    if (req.url.startsWith('/api')) {
+        return res.status(404).json({ error: "API Endpoint non trovato" });
     }
-    console.error("❌ OYASUMI: Index.html non trovato! Verifica la build.");
-    return null;
-};
 
-const finalPath = getFrontendPath();
-
-if (finalPath) {
-    // 1. File Statici (immagini, css, js)
-    app.use(express.static(finalPath));
-
-    // 2. CATCH-ALL con REGEX OBJECT (/.*/)
-    // Questo è il trucco: passando una Regex vera, evitiamo il crash di Express 5
-    // e catturiamo sicuramente ogni richiesta GET rimasta pendente.
-    app.get(/.*/, (req, res) => {
-        // Se qualcuno cerca un'API che non esiste, diamo 404 JSON
-        if (req.url.startsWith('/api')) {
-            return res.status(404).json({ message: "API endpoint non trovato" });
+    // Altrimenti, forziamo l'invio di index.html
+    res.sendFile(indexFile, (err) => {
+        if (err) {
+            console.error("❌ ERRORE CRITICO invio file:", err);
+            res.status(500).send("Errore Server: Impossibile caricare il gioco.");
         }
-
-        // Per tutto il resto (/forum, /gestione, ecc...), diamo l'index.html
-        res.sendFile(path.join(finalPath, 'index.html'), (err) => {
-            if (err) {
-                console.error("❌ Errore critico invio index.html:", err);
-                if (!res.headersSent) res.status(500).send("Errore caricamento gioco.");
-            }
-        });
     });
-} else {
-    // Fallback emergenza
-    app.use((req, res) => res.status(500).send("Errore configurazione: Frontend non trovato."));
-}
+});
 
-
-// --- 5. AVVIO SERVER ---
+// =================================================================
+// --- AVVIO SERVER ---
+// =================================================================
 (async () => {
     try {
         await db.raw('SELECT 1');
-        console.log(`✅ Connessione al database riuscita.`);
+        console.log(`✅ DATABASE CONNESSO.`);
+        
         httpServer.listen(port, () => {
-            console.log(`🚀 Server avviato su porta ${port}`);
+            console.log(`🚀 SERVER AVVIATO sulla porta ${port}`);
+            console.log(`👉 Pronto a servire il frontend da: ${frontendDist}`);
         });
     } catch (errore) {
-        console.error("ERRORE CRITICO AVVIO SERVER:", errore);
+        console.error("❌ ERRORE AVVIO:", errore);
         process.exit(1);
     }
 })();
