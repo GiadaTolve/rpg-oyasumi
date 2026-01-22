@@ -101,7 +101,19 @@ const finalPath = getFrontendPath();
 
 // Se il frontend esiste, servilo subito per le risorse statiche (JS/CSS)
 if (finalPath) {
-    app.use(express.static(finalPath));
+    // 1. Servi file statici, MA se non trovi il file, passa al prossimo middleware (fallthrough: true è default, ma lo esplicitiamo)
+    app.use(express.static(finalPath, { fallthrough: true })); 
+    
+    // 2. AGGIUNGIAMO SUBITO IL FALLBACK QUI
+    // Qualsiasi richiesta GET che non sia /api e non sia stata trovata come file statico
+    // viene intercettata qui e rimandata all'index.html
+    app.get('*', (req, res, next) => {
+        if (req.url.startsWith('/api') || req.url.startsWith('/socket.io')) {
+            return next(); // Lascia passare le API
+        }
+        console.log(`🔄 SPA REWRITE: ${req.url} -> index.html`);
+        res.sendFile(path.join(finalPath, 'index.html'));
+    });
 }
 
 // ⚠️ NOTA: Ho rimosso 'app.use(verificaToken)' globale perché bloccava il caricamento del sito.
@@ -2573,38 +2585,42 @@ io.on('connection', async (socket) => {
 // =================================================================
 // --- FINE ROTTE API ---
 // =================================================================
-
-// 1. Definiamo il percorso in modo secco
+// 1. Definiamo i percorsi
 const frontendDist = path.join(__dirname, '../gdr-frontend/dist');
 const indexFile = path.join(frontendDist, 'index.html');
 
 console.log("📂 PERCORSO FRONTEND:", frontendDist);
 
-// 2. Serviamo i file statici (JS, CSS, Immagini)
-// Nota: Express controlla prima se il file esiste fisicamente.
+// 2. Serviamo i file statici
+// 'fallthrough: true' è di default, ma lo esplicitiamo: se non trovi il file, vai avanti!
 if (require('fs').existsSync(frontendDist)) {
     app.use(express.static(frontendDist));
+} else {
+    console.error("❌ ERRORE: Cartella dist non trovata!");
 }
 
-// 3. IL "CATCH-ALL" DEFINITIVO (Versione Regex per Express 5)
-// Usiamo new RegExp('.*') per forzare Express a catturare QUALSIASI richiesta GET rimasta.
-app.get(new RegExp('.*'), (req, res) => {
+// 3. IL "CATCH-ALL" CHE NON PERDONA (Middleware)
+// In Express 5, questo è il modo più sicuro per dire "Se sei arrivato qui, prendi questo HTML".
+app.use((req, res, next) => {
     
-    // Debug Log: Questo DEVE apparire nei log di Render se visiti /forum
-    console.log(`🔍 SPA ROUTING: Richiesto ${req.url} -> Invio index.html`);
-
-    // Se per sbaglio è una chiamata API, diamo errore JSON per non rompere il client
-    if (req.url.startsWith('/api')) {
-        return res.status(404).json({ error: "API Endpoint non trovato" });
+    // Ignoriamo API e Socket per non rompere il backend
+    if (req.url.startsWith('/api') || req.url.startsWith('/socket.io')) {
+        return next(); // Lascia che vada al gestore 404 finale o socket
     }
 
-    // Per tutto il resto (/forum, /gestione, /scheda) -> Mandiamo index.html
-    res.sendFile(indexFile, (err) => {
-        if (err) {
-            console.error("❌ ERRORE CRITICO invio file:", err);
-            if (!res.headersSent) res.status(500).send("Errore Server: Impossibile caricare il gioco.");
-        }
-    });
+    // Se la richiesta è GET e accetta HTML (quindi è un browser che naviga)
+    if (req.method === 'GET' && req.accepts('html')) {
+        console.log(`🔄 SPA REWRITE: ${req.url} -> index.html`);
+        return res.sendFile(indexFile, (err) => {
+            if (err) {
+                console.error("❌ ERRORE INVIO INDEX:", err);
+                if (!res.headersSent) res.status(500).send("Errore Server Frontend");
+            }
+        });
+    }
+
+    // Se non è HTML (es. favicon mancante o css rotto), prosegui
+    next();
 });
 
 // =================================================================
