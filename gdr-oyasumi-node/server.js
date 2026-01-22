@@ -891,7 +891,7 @@ app.post('/api/admin/locations', verificaToken, verificaMod, async (req, res) =>
     }
 });
 
-a// [PUT] AGGIORNAMENTO LOCATION (MAPPA/CHAT) DA ADMIN
+// [PUT] AGGIORNAMENTO LOCATION (MAPPA/CHAT) DA ADMIN
 app.put('/api/admin/locations/:id', verificaToken, verificaMod, async (req, res) => {
     const { id } = req.params;
     
