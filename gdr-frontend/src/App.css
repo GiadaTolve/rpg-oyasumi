@@ -67,6 +67,43 @@ body {
   text-shadow: 0 0 10px #a270ff, 0 0 20px rgba(162, 112, 255, 0.4);
 }
 
+/* --- FIX TASTI HEADER (MAPPA, FORUM, GESTIONE) --- */
+.header-actions .header-btn, 
+.header-actions a.header-btn {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(162, 112, 255, 0.2) !important;
+  color: #b3b3c0 !important;
+  font-family: 'Cinzel', serif !important;
+  font-weight: 700 !important;
+  font-size: 0.8rem !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+  padding: 0 20px !important;
+  height: 35px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  border-radius: 4px !important;
+  text-decoration: none !important; /* RIMUOVE LA SOTTOLINEATURA BLU */
+}
+
+.header-actions .header-btn:hover, 
+.header-actions a.header-btn:hover {
+  background: rgba(162, 112, 255, 0.1) !important;
+  border-color: #a270ff !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 10px rgba(162, 112, 255, 0.3) !important;
+  text-decoration: none !important;
+}
+
+/* Fix per il tasto Logout (Rosso) */
+.header-actions button.header-btn[style*="color: rgb(255, 138, 138)"],
+.header-actions button.header-btn[style*="color: #ff8a8a"] {
+    border-color: rgba(255, 42, 42, 0.4) !important;
+}
+
 /* --- 3. SIDEBARS --- */
 .left-sidebar { 
   grid-area: sidebar-left; 

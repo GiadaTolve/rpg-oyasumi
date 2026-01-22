@@ -140,3 +140,9 @@ select, option {
   color: #bfc0d1 !important;
   font-family: var(--primary-font);
 }
+
+a {
+  font-weight: 500;
+  text-decoration: none; /* Rimuove sottolineatura globale */
+  color: inherit;       /* Prende il colore del genitore invece del blu */
+}
