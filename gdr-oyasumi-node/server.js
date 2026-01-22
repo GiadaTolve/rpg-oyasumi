@@ -2542,17 +2542,17 @@ io.on('connection', async (socket) => {
 // SERVE FRONTEND REACT (RENDER)
 // ===============================
 
-// 1. Middleware per servire i file statici
+// 1. Middleware per i file statici (CSS, JS, Immagini)
 app.use(express.static(path.join(__dirname, '../gdr-frontend/dist')));
 
-// 2. Rotta catch-all compatibile con path-to-regexp v8
-// Usiamo la sintassi 'splat' (*) per catturare tutto senza errori di validazione
-app.get('*', (req, res, next) => {
-    // Se la richiesta inizia con /api, la lasciamo passare alle rotte sopra
+// 2. Rotta catch-all "Blindata"
+// Usiamo la sintassi :splat(*) che è compatibile con path-to-regexp v8
+app.get('/:splat(*)', (req, res) => {
+    // Se la richiesta è per un'API, non mandare l'HTML (evita loop strani)
     if (req.path.startsWith('/api')) {
-        return next();
+        return res.status(404).json({ message: "API endpoint not found" });
     }
-    // Per tutto il resto, mandiamo l'index.html
+    // Per tutte le altre rotte (URL del browser), manda l'index.html
     res.sendFile(path.join(__dirname, '../gdr-frontend/dist/index.html'));
 });
 
