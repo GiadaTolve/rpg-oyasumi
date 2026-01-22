@@ -2581,10 +2581,10 @@ io.on('connection', async (socket) => {
     }
 });
 
-
 // =================================================================
 // --- FINE ROTTE API ---
 // =================================================================
+
 // 1. Definiamo i percorsi
 const frontendDist = path.join(__dirname, '../gdr-frontend/dist');
 const indexFile = path.join(frontendDist, 'index.html');
@@ -2592,24 +2592,24 @@ const indexFile = path.join(frontendDist, 'index.html');
 console.log("📂 PERCORSO FRONTEND:", frontendDist);
 
 // 2. Serviamo i file statici
-// 'fallthrough: true' è di default, ma lo esplicitiamo: se non trovi il file, vai avanti!
+// fallthrough: true permette di passare oltre se il file non esiste
 if (require('fs').existsSync(frontendDist)) {
-    app.use(express.static(frontendDist));
-} else {
-    console.error("❌ ERRORE: Cartella dist non trovata!");
+    app.use(express.static(frontendDist, { fallthrough: true }));
 }
 
-// 3. IL "CATCH-ALL" CHE NON PERDONA (Middleware)
-// In Express 5, questo è il modo più sicuro per dire "Se sei arrivato qui, prendi questo HTML".
+// 3. IL "CATCH-ALL" CHE NON CRASHA (Middleware Puro)
+// IMPORTANTE: Usiamo app.use() SENZA path. 
+// In questo modo Express NON usa "path-to-regexp" (che causava l'errore)
+// ma esegue questa funzione per qualsiasi richiesta rimasta in sospeso.
 app.use((req, res, next) => {
     
-    // Ignoriamo API e Socket per non rompere il backend
+    // Se è una richiesta API o Socket, non toccarla (lascia che muoia o sia gestita da socket)
     if (req.url.startsWith('/api') || req.url.startsWith('/socket.io')) {
-        return next(); // Lascia che vada al gestore 404 finale o socket
+        return res.status(404).json({ error: "API Endpoint non trovato" });
     }
 
-    // Se la richiesta è GET e accetta HTML (quindi è un browser che naviga)
-    if (req.method === 'GET' && req.accepts('html')) {
+    // Se la richiesta è GET (quindi una pagina del browser), mandiamo l'index.html
+    if (req.method === 'GET') {
         console.log(`🔄 SPA REWRITE: ${req.url} -> index.html`);
         return res.sendFile(indexFile, (err) => {
             if (err) {
@@ -2619,7 +2619,6 @@ app.use((req, res, next) => {
         });
     }
 
-    // Se non è HTML (es. favicon mancante o css rotto), prosegui
     next();
 });
 
