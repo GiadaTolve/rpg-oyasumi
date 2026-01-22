@@ -2592,24 +2592,23 @@ const indexFile = path.join(frontendDist, 'index.html');
 
 console.log("📂 PERCORSO FRONTEND:", frontendDist);
 
-// 2. Serviamo i file statici
-// fallthrough: true permette di passare oltre se il file non esiste
+// 2. Serviamo i file statici (JS, CSS, Immagini)
 if (require('fs').existsSync(frontendDist)) {
+    // 'fallthrough: true' dice a Express: se non trovi il file, non dare 404, passa al prossimo blocco!
     app.use(express.static(frontendDist, { fallthrough: true }));
 }
 
-// 3. IL "CATCH-ALL" CHE NON CRASHA (Middleware Puro)
-// IMPORTANTE: Usiamo app.use() SENZA path. 
-// In questo modo Express NON usa "path-to-regexp" (che causava l'errore)
-// ma esegue questa funzione per qualsiasi richiesta rimasta in sospeso.
+// 3. IL "CATCH-ALL" BLINDATO (Middleware Puro)
+// IMPORTANTE: Usiamo app.use() SENZA percorsi. 
+// Questo evita che Express 5 provi ad analizzare l'URL e crashi.
 app.use((req, res, next) => {
     
-    // Se è una richiesta API o Socket, non toccarla (lascia che muoia o sia gestita da socket)
+    // Se è una chiamata API o Socket che non esiste, diamo il vero 404 JSON
     if (req.url.startsWith('/api') || req.url.startsWith('/socket.io')) {
         return res.status(404).json({ error: "API Endpoint non trovato" });
     }
 
-    // Se la richiesta è GET (quindi una pagina del browser), mandiamo l'index.html
+    // Se è un browser che cerca una pagina (GET), mandiamo index.html
     if (req.method === 'GET') {
         console.log(`🔄 SPA REWRITE: ${req.url} -> index.html`);
         return res.sendFile(indexFile, (err) => {
@@ -2620,6 +2619,7 @@ app.use((req, res, next) => {
         });
     }
 
+    // Per tutto il resto, prosegui
     next();
 });
 
