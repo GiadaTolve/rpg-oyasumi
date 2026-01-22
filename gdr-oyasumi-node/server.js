@@ -2540,57 +2540,49 @@ io.on('connection', async (socket) => {
         socket.disconnect();
     }
 });
-
 // =============================================
-// SERVE FRONTEND REACT (RENDER) - FIX DEFINITIVO
+// SERVE FRONTEND REACT (RENDER) - FIX EXPRESS 5
 // =============================================
 
 const getFrontendPath = () => {
     const possiblePaths = [
-        path.resolve(__dirname, '..', 'gdr-frontend', 'dist'),
-        path.resolve(process.cwd(), '..', 'gdr-frontend', 'dist'),
-        path.resolve(process.cwd(), 'gdr-frontend', 'dist'),
-        '/opt/render/project/src/gdr-frontend/dist' // Percorso assoluto tipico di Render
+        '/opt/render/project/src/gdr-frontend/dist',
+        path.join(process.cwd(), 'gdr-frontend', 'dist'),
+        path.join(__dirname, '..', 'gdr-frontend', 'dist'),
+        path.join(__dirname, 'dist')
     ];
 
     for (let p of possiblePaths) {
-        const indexPath = path.join(p, 'index.html');
-        if (require('fs').existsSync(indexPath)) {
-            console.log(`✅ OYASUMI: Frontend trovato con successo in: ${p}`);
+        if (require('fs').existsSync(path.join(p, 'index.html'))) {
+            console.log(`✅ OYASUMI: Frontend trovato in: ${p}`);
             return p;
         }
     }
-    console.error("❌ OYASUMI: Errore critico! Cartella 'dist' non trovata nei percorsi mappati.");
+    console.error("❌ OYASUMI: Index.html non trovato! Verifica la build.");
     return null;
 };
 
 const finalPath = getFrontendPath();
 
 if (finalPath) {
-    // 1. Servi i file statici fisici (js, css, immagini)
     app.use(express.static(finalPath));
 
-    // 2. GESTIONE ROTTE SPA (Refresh Fix)
-    // Usiamo app.use invece di app.get('*') per evitare il crash di Node 22
+    // FIX PER EXPRESS 5: Usa app.use senza path
     app.use((req, res, next) => {
-        // Se la richiesta è per un'API, non mandare l'HTML
-        if (req.originalUrl.startsWith('/api')) {
-            return next();
+        if (req.url.startsWith('/api')) {
+            return res.status(404).json({ message: "API endpoint non trovato" });
         }
-
-        // Se arriviamo qui, inviamo l'index.html per gestire il routing lato React
         res.sendFile(path.join(finalPath, 'index.html'), (err) => {
-            if (err) {
-                console.error("❌ Errore durante l'invio di index.html:", err);
-                res.status(404).send("Applicazione non disponibile.");
+            if (err && !res.headersSent) {
+                console.error("❌ Errore invio index.html:", err);
+                res.status(500).send("Errore server frontend.");
             }
         });
     });
 } else {
-    app.get('*', (req, res) => {
-        res.status(500).send("Errore di configurazione del server: Frontend non trovato.");
-    });
+    app.use((req, res) => res.status(500).send("Errore critico: Build frontend mancante."));
 }
+
 
 // --- 5. AVVIO SERVER ---
 (async () => {
