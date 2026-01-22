@@ -2547,7 +2547,7 @@ app.use(express.static(path.join(__dirname, '../gdr-frontend/dist')));
 
 // Rotta catch-all: qualsiasi rotta non-API restituisce index.html
 // Questa rotta DEVE essere dopo tutte le rotte /api ma prima dell'avvio del server
-app.get('*', (req, res) => {
+app.get('/*', (req, res) => {
     res.sendFile(
         path.join(__dirname, '../gdr-frontend/dist/index.html')
     );
