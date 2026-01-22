@@ -1,53 +1,77 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import api from '../api';
 
 function Header({ user, onLogout, onToggleGuida, onToggleAmbientazione, onToggleShinigami }) {
   const [activeBanner, setActiveBanner] = useState(null);
-  const location = useLocation(); // Per gestire lo stato attivo se serve
 
   useEffect(() => {
     const fetchBanner = async () => {
       try {
         const response = await api.get('/active-banner');
         setActiveBanner(response.data);
-      } catch (error) { console.error(error); }
+      } catch (error) {
+        console.error("Errore nel caricare il banner:", error);
+      }
     };
+
     fetchBanner();
   }, []);
 
   return (
     <header className="game-header">
+      {/* --- BANNER EVENTO --- */}
       {activeBanner ? (
         <a href={activeBanner.link_url || '#'} target="_blank" rel="noopener noreferrer" className="event-banner-container">
           <img src={activeBanner.image_url} alt={activeBanner.title} className="event-banner-image" />
           <span className="event-banner-title">{activeBanner.title}</span>
         </a>
       ) : (
-        <div style={{ width: '300px' }}></div>
+        <div style={{ width: '300px' }}></div> 
       )}
 
+      {/* --- TITOLO CENTRALE --- */}
       <div className="title-container">
         <div className="gold-title-effect">Oyasumi</div>
         <p className="header-motto">LA REALTA' E' SOLO UN SOGNO CHE SANGUINA.</p>
       </div>
 
+      {/* --- AZIONI HEADER (TUTTI STILIZZATI COME BOTTONI) --- */}
       <div className="header-actions">
-        {/* Usiamo Link con la classe header-btn per uniformità */}
-        <Link to="/" className="header-btn">Mappa</Link>
-        <button onClick={onToggleGuida} className="header-btn">Guida</button>
-        <button onClick={onToggleAmbientazione} className="header-btn">Ambientazione</button>
-        <Link to="/forum" className="header-btn">Forum</Link>
+        {/* Link Mappa: ora usa la classe header-btn per non sembrare un hyperlink */}
+        <Link to="/" className="header-btn">
+          Mappa
+        </Link>
         
-        {/* Solo Staff */}
+        {/* Guida e Ambientazione (Bottoni per finestre flottanti) */}
+        <button onClick={onToggleGuida} className="header-btn">
+          Guida
+        </button>
+        <button onClick={onToggleAmbientazione} className="header-btn">
+          Ambientazione
+        </button>
+
+        {/* Link Forum: stilizzato come bottone */}
+        <Link to="/forum" className="header-btn">
+          Forum
+        </Link>
+        
+        {/* Sezione Staff */}
         {(['MASTER', 'MOD', 'ADMIN'].includes(user?.permesso)) && (
           <>
-            <button onClick={onToggleShinigami} className="header-btn">Shinigami</button>
-            <Link to="/gestione" className="header-btn">Gestione</Link>
+            <button onClick={onToggleShinigami} className="header-btn">
+              Shinigami
+            </button>
+            <Link to="/gestione" className="header-btn">
+              Gestione
+            </Link>
           </>
         )}
         
-        <button onClick={onLogout} className="header-btn" style={{color: '#ff8a8a'}}>Logout</button>
+        {/* Logout con stile rosso per pericolo */}
+        <button onClick={onLogout} className="header-btn" style={{ borderColor: 'rgba(255, 42, 42, 0.4)', color: '#ff8a8a' }}>
+          Logout
+        </button>
       </div>
     </header>
   );
