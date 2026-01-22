@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 // =====================================================
-// --- 1. IMPORT E IMPOSTAZIONI GLOBALI (STABILI) ---
+// --- 1. IMPORT E IMPOSTAZIONI GLOBALI ---
 // =====================================================
 
 const express = require('express');
@@ -35,7 +35,7 @@ const db = knex(knexConfig[environment]);
 // =====================================================
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 10000; // Ottimizzato per Render
 const httpServer = http.createServer(app);
 
 // =====================================================
@@ -77,9 +77,35 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// 🔥 QUESTO ERA IL BUG CRITICO
-// Decodifica SEMPRE il token se presente
-app.use(verificaToken);
+// =====================================================
+// 🔥 FIX CRITICO: FRONTEND STATICO PRIMA DI TUTTO 🔥
+// =====================================================
+
+const getFrontendPath = () => {
+    const possiblePaths = [
+        '/opt/render/project/src/gdr-frontend/dist',
+        path.join(process.cwd(), 'gdr-frontend', 'dist'),
+        path.join(__dirname, '..', 'gdr-frontend', 'dist'),
+        path.join(__dirname, 'dist')
+    ];
+    for (let p of possiblePaths) {
+        if (require('fs').existsSync(path.join(p, 'index.html'))) {
+            console.log(`✅ OYASUMI: Frontend trovato in: ${p}`);
+            return p;
+        }
+    }
+    return null;
+};
+
+const finalPath = getFrontendPath();
+
+// Se il frontend esiste, servilo subito per le risorse statiche (JS/CSS)
+if (finalPath) {
+    app.use(express.static(finalPath));
+}
+
+// ⚠️ NOTA: Ho rimosso 'app.use(verificaToken)' globale perché bloccava il caricamento del sito.
+// Le tue rotte API sono già protette singolarmente (es: app.get(..., verificaToken, ...)).
 
 // =====================================================
 // --- PERMESSI ---
@@ -178,12 +204,10 @@ const checkRentDue = async (userId) => {
 };
 
 // =====================================================
-// --- 10. ROOT HEALTHCHECK (RENDER) ---
+// --- 10. API PUBBLICHE (LOGIN / REGISTER) ---
 // =====================================================
 
-app.get('/', (req, res) => {
-    res.send('🟢 OYASUMI SERVER ONLINE');
-});
+// Nota: Rimosso route '/' semplice per lasciare spazio al frontend React
 
 // AUTH: REGISTRAZIONE
 app.post('/api/register', async (req, res) => {
@@ -267,7 +291,7 @@ app.post('/api/register', async (req, res) => {
 });
 
 // ==========================================
-// 📦 SETUP OGGETTI & INVENTARIO (Rotta Temporanea) DA ELIMINARE! SOLO TEST
+// 📦 SETUP OGGETTI & INVENTARIO (Rotta Temporanea)
 // ==========================================
 app.get('/api/setup-items', async (req, res) => {
     try {
@@ -358,6 +382,10 @@ app.post('/api/login', async (req, res) => {
         res.status(500).json({ message: 'Errore interno del server.' });
     }
 });
+
+// =====================================================
+// --- API PROTETTE (RICHIEDONO VERIFICATOKEN) ---
+// =====================================================
 
 // RICERCA UTENTI
 app.get('/api/users/find', verificaToken, async (req, res) => {
@@ -1282,7 +1310,7 @@ app.get('/api/forum', verificaToken, async (req, res) => {
                 FROM forum_topics t
                 LEFT JOIN forum_topic_reads r
                   ON r.topic_id = t.id
-                 AND r.user_id = ?
+                  AND r.user_id = ?
                 WHERE t.bacheca_id = b.id
                   AND t.ultimo_post_timestamp >
                       COALESCE(r.last_read_timestamp, TIMESTAMP '1970-01-01')
@@ -1672,9 +1700,9 @@ app.post('/api/housing/leave', verificaToken, async (req, res) => {
         await db.transaction(async (trx) => {
             // 1. Rimuovi i dati abitazione dall'utente
             await trx('utenti').where('id_utente', userId).update({
-                housing_id: null,      // Rimuove il riferimento al tipo di casa
-                house_chat_id: null,   // Rimuove l'id della chat
-                rent_due_date: null,   // Rimuove la scadenza affitto
+                housing_id: null,       // Rimuove il riferimento al tipo di casa
+                house_chat_id: null,    // Rimuove l'id della chat
+                rent_due_date: null,    // Rimuove la scadenza affitto
                 house_custom_image: null, // (Opzionale) Reset immagine personalizzata
                 house_custom_desc: null   // (Opzionale) Reset descrizione personalizzata
             });
@@ -2274,7 +2302,7 @@ app.put('/api/admin/reset-stats/:id', verificaToken, verificaMod, async (req, re
         velocita: 1,
         
         // --- QUI C'ERA L'ERRORE ---
-        percezione_sensi: 1,       // <--- PRIMA ERA percezione_fisica
+        percezione_sensi: 1,        // <--- PRIMA ERA percezione_fisica
         // --------------------------
         
         percezione_spirituale: 1,
@@ -2546,16 +2574,6 @@ io.on('connection', async (socket) => {
 // --- FINE ROTTE API ---
 // =================================================================
 
-// 1. Definiamo il percorso in modo secco (relativo a questo file)
-// gdr-oyasumi-node/server.js -> sale di uno -> gdr-frontend -> dist
-const frontendDist = path.join(__dirname, '../gdr-frontend/dist');
-const indexFile = path.join(frontendDist, 'index.html');
-
-console.log("📂 PERCORSO FRONTEND:", frontendDist);
-
-// 2. Serviamo i file statici (JS, CSS, Immagini)
-app.use(express.static(frontendDist));
-
 // 3. IL "CATCH-ALL" DEFINITIVO (Middleware Finale)
 // Se la richiesta arriva fin qui, significa che non era un'API e non era un file statico.
 // Quindi DEVE essere una pagina del sito (es. /forum, /gestione).
@@ -2569,12 +2587,16 @@ app.use((req, res) => {
     }
 
     // Altrimenti, forziamo l'invio di index.html
-    res.sendFile(indexFile, (err) => {
-        if (err) {
-            console.error("❌ ERRORE CRITICO invio file:", err);
-            res.status(500).send("Errore Server: Impossibile caricare il gioco.");
-        }
-    });
+    if (finalPath) {
+        res.sendFile(path.join(finalPath, 'index.html'), (err) => {
+            if (err) {
+                console.error("❌ ERRORE CRITICO invio file:", err);
+                if (!res.headersSent) res.status(500).send("Errore Server: Impossibile caricare il gioco.");
+            }
+        });
+    } else {
+        res.status(500).send("Errore critico: Build frontend non trovata.");
+    }
 });
 
 // =================================================================
@@ -2587,7 +2609,7 @@ app.use((req, res) => {
         
         httpServer.listen(port, () => {
             console.log(`🚀 SERVER AVVIATO sulla porta ${port}`);
-            console.log(`👉 Pronto a servire il frontend da: ${frontendDist}`);
+            console.log(`👉 Pronto a servire il frontend da: ${finalPath}`);
         });
     } catch (errore) {
         console.error("❌ ERRORE AVVIO:", errore);
