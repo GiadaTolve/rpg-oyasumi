@@ -974,12 +974,15 @@ app.delete('/api/admin/locations/:id', verificaToken, verificaAdmin, async (req,
 
 app.get('/api/admin/forum/sezioni', verificaToken, verificaMod, async (req, res) => {
     try {
+        const sezioni = await db('forum_sezioni')
+            .orderBy('ordine', 'asc');
         res.json(sezioni);
     } catch (e) {
         console.error("Errore get sezioni:", e);
         res.status(500).json({ message: "Errore recupero sezioni." });
     }
 });
+
 
 app.post('/api/admin/forum/sezioni', verificaToken, verificaMod, async (req, res) => {
     const { titolo, descrizione, ordine } = req.body;
@@ -2538,7 +2541,6 @@ io.on('connection', async (socket) => {
     }
 });
 
-
 // =============================================
 // SERVE FRONTEND REACT (RENDER) - FIX DEFINITIVO
 // =============================================
@@ -2546,58 +2548,55 @@ io.on('connection', async (socket) => {
 const getFrontendPath = () => {
     const possiblePaths = [
         path.resolve(__dirname, '..', 'gdr-frontend', 'dist'),
-        path.resolve(__dirname, '..', '..', 'gdr-frontend', 'dist'),
+        path.resolve(process.cwd(), '..', 'gdr-frontend', 'dist'),
         path.resolve(process.cwd(), 'gdr-frontend', 'dist'),
-        path.resolve(process.cwd(), '..', 'gdr-frontend', 'dist')
+        '/opt/render/project/src/gdr-frontend/dist' // Percorso assoluto tipico di Render
     ];
 
     for (let p of possiblePaths) {
-        if (require('fs').existsSync(path.join(p, 'index.html'))) {
-            console.log(`✅ OYASUMI: Frontend trovato in: ${p}`);
+        const indexPath = path.join(p, 'index.html');
+        if (require('fs').existsSync(indexPath)) {
+            console.log(`✅ OYASUMI: Frontend trovato con successo in: ${p}`);
             return p;
         }
     }
-    console.error("❌ OYASUMI: Errore critico! index.html non trovato.");
-    return possiblePaths[0];
+    console.error("❌ OYASUMI: Errore critico! Cartella 'dist' non trovata nei percorsi mappati.");
+    return null;
 };
 
 const finalPath = getFrontendPath();
 
-// 1. Servi i file statici
-app.use(express.static(finalPath));
+if (finalPath) {
+    // 1. Servi i file statici fisici (js, css, immagini)
+    app.use(express.static(finalPath));
 
-// 2. GESTIONE ROTTE (Fix definitivo per Node 22 / Express 5)
-// Usiamo un middleware generico senza stringa di percorso per evitare il crash 'path-to-regexp'
-app.use((req, res, next) => {
-    // Se la richiesta inizia con /api, esce da questo middleware 
-    // e prosegue verso le rotte API definite sopra
-    if (req.originalUrl.startsWith('/api')) {
-        return next();
-    }
-
-    // Se Express non ha trovato un file statico corrispondente (es. .js, .css, .png)
-    // allora inviamo l'index.html per gestire il routing lato React
-    res.sendFile(path.join(finalPath, 'index.html'), (err) => {
-        if (err) {
-            // Se l'errore non è che il file manca (es. connessione chiusa), logghiamo
-            if (err.status !== 404) {
-                console.error("❌ Errore critico sendFile:", err);
-            }
-            next();
+    // 2. GESTIONE ROTTE SPA (Refresh Fix)
+    // Usiamo app.use invece di app.get('*') per evitare il crash di Node 22
+    app.use((req, res, next) => {
+        // Se la richiesta è per un'API, non mandare l'HTML
+        if (req.originalUrl.startsWith('/api')) {
+            return next();
         }
-    });
-});
 
-// 3. Fallback finale per API non trovate (opzionale ma consigliato)
-app.use('/api', (req, res) => {
-    res.status(404).json({ message: "Endpoint API non trovato." });
-});
+        // Se arriviamo qui, inviamo l'index.html per gestire il routing lato React
+        res.sendFile(path.join(finalPath, 'index.html'), (err) => {
+            if (err) {
+                console.error("❌ Errore durante l'invio di index.html:", err);
+                res.status(404).send("Applicazione non disponibile.");
+            }
+        });
+    });
+} else {
+    app.get('*', (req, res) => {
+        res.status(500).send("Errore di configurazione del server: Frontend non trovato.");
+    });
+}
 
 // --- 5. AVVIO SERVER ---
 (async () => {
     try {
         await db.raw('SELECT 1');
-        console.log(`✅ Connessione al database (${environment}) riuscita.`);
+        console.log(`✅ Connessione al database riuscita.`);
         httpServer.listen(port, () => {
             console.log(`🚀 Server avviato su porta ${port} in modalità ${environment}`);
         });
