@@ -2566,20 +2566,31 @@ const finalPath = getFrontendPath();
 // 1. Servi i file statici
 app.use(express.static(finalPath));
 
-// 2. GESTIONE ROTTE (Compatibile Node 22)
-// Usiamo la stringa '*' semplice e filtriamo manualmente le chiamate API
-app.get('*', (req, res, next) => {
-    // Se la richiesta inizia con /api, la passiamo alle rotte API definite sopra
+// 2. GESTIONE ROTTE (Fix definitivo per Node 22 / Express 5)
+// Usiamo un middleware generico senza stringa di percorso per evitare il crash 'path-to-regexp'
+app.use((req, res, next) => {
+    // Se la richiesta inizia con /api, esce da questo middleware 
+    // e prosegue verso le rotte API definite sopra
     if (req.originalUrl.startsWith('/api')) {
         return next();
     }
-    // Per tutte le altre (es: /gestione, /forum), mandiamo l'index.html
+
+    // Se Express non ha trovato un file statico corrispondente (es. .js, .css, .png)
+    // allora inviamo l'index.html per gestire il routing lato React
     res.sendFile(path.join(finalPath, 'index.html'), (err) => {
         if (err) {
-            console.error("❌ Errore invio index.html:", err);
-            res.status(500).send("Errore nel caricamento del gioco.");
+            // Se l'errore non è che il file manca (es. connessione chiusa), logghiamo
+            if (err.status !== 404) {
+                console.error("❌ Errore critico sendFile:", err);
+            }
+            next();
         }
     });
+});
+
+// 3. Fallback finale per API non trovate (opzionale ma consigliato)
+app.use('/api', (req, res) => {
+    res.status(404).json({ message: "Endpoint API non trovato." });
 });
 
 // --- 5. AVVIO SERVER ---
