@@ -1,4 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&display=swap');
+/* ============================================= */
+/* LOGIN.CSS - DARK ARCANE STYLE                 */
+/* ============================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Work+Sans:wght@300;400;600&display=swap');
 
 @keyframes glitch {
   0% { transform: translate(0); }
@@ -10,147 +14,166 @@
 }
 
 .login-page-container {
-  --neon-purple: #7e7e7e;
-  --dark-purple: #4B0082;
-  --glitch-cyan: #531c69;
-  --glitch-magenta: #230e23;
-  --matte-black: #1a1a1a;
-  --text-color: #484848;
-  --button-bg: #2a2a2a;
-  --panel-bg: #363636; /* Antracite */
+  /* Palette Dark Arcane */
+  --primary-purple: #a270ff;
+  --dark-accent: #320d41;
+  --gold-accent: #c9a84a;
+  --matte-black: #050508;
+  --panel-bg: rgba(8, 8, 12, 0.95);
+  --text-dim: #bfc0d1;
+  --input-bg: #1a1a1a;
 
   position: fixed;
   top: 0; left: 0;
   width: 100vw; height: 100vh;
   overflow: hidden;
-  font-family: 'Roboto Condensed', sans-serif;
+  font-family: 'Work Sans', sans-serif;
+  background-color: var(--matte-black);
 }
 
-.login-background, .login-overlay {
+/* --- SFONDO --- */
+.login-background { 
   position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: url('/backgrounds/darkdusk.png') no-repeat center center/cover; 
   z-index: -2;
 }
-.login-background { background: url('/backgrounds/darkdusk.png') no-repeat center center/cover; }
-.login-overlay { background-color: rgba(0, 0, 0, 0.6); z-index: -1; }
+
+.login-overlay { 
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: radial-gradient(circle, rgba(0,0,0,0.4) 0%, rgba(5,5,8,0.9) 100%);
+  z-index: -1; 
+}
 
 .main-content-wrapper {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
   padding: 2vh 20px;
-  gap: 1.5rem;
+  gap: 2rem;
 }
 
-.login-header {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  flex-shrink: 0;
-}
-
+/* --- TITOLO OYASUMI (GOLD & GLITCH) --- */
 .login-title {
   position: relative;
   font-family: 'oyasumifont', sans-serif;
-  font-size: clamp(5rem, 18vw, 11rem);
-  color: var(--neon-purple);
-  text-shadow: 0 0 7px var(--neon-purple), 0 0 15px var(--neon-purple), 0 0 25px var(--dark-purple);
+  font-size: clamp(5rem, 15vw, 10rem);
+  /* Effetto Oro come nel GameLayout */
+  background: linear-gradient(to bottom, #efe784, #cf9a31, #b37f1f);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0px 4px 10px rgba(0, 0, 0, 0.5);
   text-align: center;
   z-index: 1;
 }
 
-.login-title::before, .login-title::after {
-  content: 'Oyasumi';
-  position: absolute; top: 0; left: 0;
-  width: 100%; height: 100%;
-  background: transparent; overflow: hidden;
-  clip: rect(auto, auto, auto, auto);
-}
-.login-title::before {
-  color: var(--glitch-cyan); left: 2px;
-  text-shadow: -1px 0 var(--glitch-magenta);
-  animation: glitch 2s infinite linear alternate-reverse;
-}
-.login-title::after {
-  color: var(--glitch-magenta); left: -2px;
-  text-shadow: -1px 0 var(--glitch-cyan);
-  animation: glitch 3s infinite linear alternate-reverse;
-}
-
-.login-main-nav {
-  display: flex;
-  gap: 15px;
-}
-
+/* --- PANNELLO CENTRALE (GLASSMORPHISM) --- */
 .dynamic-content-panel {
   width: 100%;
-  max-width: 550px;
-  flex-grow: 1;
-  background-color: #1a1a1a;
-  color: #5e5e5e;
-  border:1px solid #320d41;
-  border-radius: 4px;
-  overflow-y: auto;
-  min-height: 200px;
+  max-width: 500px;
+  background: var(--panel-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--dark-accent);
+  border-radius: 2px;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.8), 0 0 15px rgba(162, 112, 255, 0.1);
+  overflow: hidden;
+  animation: fadeIn 0.8s ease-out;
 }
 
-.login-form { padding: 1.5rem; width: 70%; margin:auto;}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.login-form { padding: 2.5rem; }
+
 .login-form h2 {
-  margin-top: 0;
-  font-family: 'Roboto', sans-serif;
+  font-family: 'Cinzel', serif;
+  color: var(--gold-accent);
+  font-size: 1.2rem;
   text-transform: uppercase;
-  color: var(--neon-purple);
-  font-size: 1rem;
+  letter-spacing: 3px;
   text-align: center;
-}
-.login-form-group { margin-bottom: 25px; }
-.login-input {
-  width: 100%; background: #383838;
-  border: none; border-bottom: 1px solid #320d41;
-  color: var(--text-color); padding: 8px 5px;
-  font-size: 16px; transition: border-color 0.3s ease;
-}
-.login-input:focus { outline: none; border-bottom-color: var(--neon-purple); }
-.login-error {
-  color: #ff8a8a; text-align: center;
-  margin-bottom: 15px; font-size: 14px;
-
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--dark-accent);
+  padding-bottom: 10px;
 }
 
-.button-style {
-  background-color: var(--button-bg);
-  border: 1px solid #111;
+/* --- INPUT & TENDINE (FIX BIANCO) --- */
+.login-form-group { margin-bottom: 20px; }
+
+.login-input, 
+select.login-input,
+textarea.login-input {
+  width: 100%; 
+  background-color: var(--input-bg) !important;
+  border: 1px solid var(--dark-accent) !important;
   border-radius: 0;
-  color: #888;
-  padding: 5px 15px;
-  margin: auto;
+  color: var(--text-dim) !important;
+  padding: 12px 15px;
   font-size: 14px;
+  font-family: 'Work Sans', sans-serif;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+/* Fix specifico per le opzioni delle tendine */
+.login-input option {
+  background-color: #1a1a1a !important;
+  color: #bfc0d1 !important;
+}
+
+.login-input:focus {
+  outline: none;
+  border-color: var(--primary-purple) !important;
+  box-shadow: 0 0 8px rgba(162, 112, 255, 0.2);
+  background-color: #222 !important;
+}
+
+/* --- BOTTONI (THEME STYLE) --- */
+.button-style {
+  background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
+  border: 1px solid #31323e;
+  color: var(--gold-accent);
+  padding: 12px 25px;
+  font-family: 'Cinzel', serif;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 1.5px;
+  letter-spacing: 2px;
   cursor: pointer;
-  box-shadow: 0px 3px 8px rgba(0, 0, 0, 0.4);
-  transition: all 0.2s ease-in-out;
-  width: 103%;
+  width: 100%;
+  transition: all 0.3s ease;
+  margin-top: 10px;
 }
-.login-main-nav .button-style { margin: auto;} /* Resetta larghezza per i bottoni nav */
 
 .button-style:hover {
-  color: #ccc;
-  background-color: #1c1c1c;
-  box-shadow: inset 0px 2px 6px rgba(0, 0, 0, 0.6);
-  transform: translateY(1px);
+  background: var(--dark-accent);
+  color: #fff;
+  border-color: var(--primary-purple);
+  box-shadow: 0 0 15px rgba(162, 112, 255, 0.3);
+}
+
+.login-main-nav { display: flex; gap: 10px; width: 100%; max-width: 500px; }
+.login-main-nav .button-style { flex: 1; font-size: 11px; padding: 10px; }
+
+/* --- ERRORI --- */
+.login-error {
+  background: rgba(255, 42, 42, 0.1);
+  border-left: 3px solid #ff2a2a;
+  color: #ff8a8a;
+  padding: 10px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  text-align: center;
 }
 
 .login-footer {
-  color: #666;
-  font-size: 18px;
-  text-align: center;
-  flex-shrink: 0;
-  padding-bottom: 1vh;
+  color: var(--text-dim);
+  font-family: 'Cinzel', serif;
+  font-size: 0.7rem;
+  letter-spacing: 2px;
+  opacity: 0.5;
+  margin-top: auto;
 }
-

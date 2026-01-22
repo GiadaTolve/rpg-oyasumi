@@ -1,20 +1,24 @@
 /* ============================================= */
-/* APP.CSS - FIX Z-INDEX & LAYOUT                */
+/* APP.CSS - CORE LAYOUT & Z-INDEX MANAGEMENT    */
 /* ============================================= */
 
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Work+Sans:wght@300;400;600&display=swap');
 
 /* --- 0. FIX GLOBALI --- */
-/* Spazio per non far coprire i contenuti dal Dock fisso in basso */
 body {
-  padding-bottom: 60px; 
-  overflow: hidden; /* Manteniamo hidden per evitare scroll doppi, gestiamo lo scroll nei container */
+  margin: 0;
+  padding: 0;
+  padding-bottom: 60px; /* Spazio per il Dock */
+  overflow: hidden; 
+  background-color: #050508;
+  font-family: 'Work Sans', sans-serif;
 }
 
-/* --- 1. LAYOUT PRINCIPALE --- */
+/* --- 1. LAYOUT PRINCIPALE (Grid 3 Colonne) --- */
 .game-container {
   display: grid;
   height: 100vh;
+  /* Proporzioni: Sidebar SX (250px) - Centro (Fluido) - Sidebar DX (290px) */
   grid-template-columns: 250px 1fr 290px;
   grid-template-rows: 140px 1fr; 
   grid-template-areas:
@@ -22,7 +26,6 @@ body {
     "sidebar-left main-content sidebar-right";
   gap: 5px;
   box-sizing: border-box;
-  background-color: #050508;
 }
 
 /* --- 2. HEADER --- */
@@ -32,170 +35,129 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 0 25px;
-  z-index: 200; /* Header sopra a tutto */
+  z-index: 500; /* Molto alto per stare sopra le finestre trascinabili se necessario */
   position: relative;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(8, 8, 12, 0.85);
   backdrop-filter: blur(12px);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(162, 112, 255, 0.2);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
 }
 
+/* Bordo decorativo inferiore dell'header */
 .game-header::after {
   content: '';
   position: absolute; bottom: 0; left: 0; right: 0; height: 6px; 
   background-image: url('/frames/borderframe.png');
-  background-size: 100% 100%; background-repeat: no-repeat;
-  z-index: 30; pointer-events: none; opacity: 0.9;
+  background-size: 100% 100%;
+  pointer-events: none;
+  opacity: 0.8;
 }
 
-/* Titolo e Bottoni (Invariati) */
 .game-title {
-  font-family: 'goat', sans-serif; color: #e6e0ff; font-size: 5.8rem; 
-  margin: 0; position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
-  z-index: 201; pointer-events: none; 
-  text-shadow: 0 0 7px #bfc0d1, 0 0 15px rgba(162, 112, 255, 0.4), 0 0 50px rgba(162, 112, 255, 0.2);
-}
-.header-actions { display: flex; align-items: center; gap: 10px; }
-.header-btn {
-  background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #b3b3c0; font-family: 'Cinzel', serif; font-weight: 700; font-size: 0.8rem;
-  letter-spacing: 1px; text-transform: uppercase; padding: 0 20px; height: 35px;
-  display: inline-flex; align-items: center; justify-content: center;
-  cursor: pointer; transition: all 0.3s ease; border-radius: 4px;
-}
-.header-btn:hover {
-  background: rgba(162, 112, 255, 0.1); border-color: #a270ff; color: white;
-  box-shadow: 0 0 10px rgba(162, 112, 255, 0.2);
+  font-family: 'oyasumifont', sans-serif; 
+  color: #e6e0ff; 
+  font-size: 4.5rem; 
+  margin: 0; 
+  position: absolute; 
+  top: 50%; 
+  left: 50%; 
+  transform: translate(-50%, -50%);
+  z-index: 501;
+  pointer-events: none; 
+  text-shadow: 0 0 10px #a270ff, 0 0 20px rgba(162, 112, 255, 0.4);
 }
 
-/* --- 3. SIDEBARS (Z-INDEX ALTO PER STARE SOPRA) --- */
+/* --- 3. SIDEBARS --- */
 .left-sidebar { 
   grid-area: sidebar-left; 
   overflow-y: auto; 
-  border-radius: 5px;
-  background: rgba(11, 11, 17, 0.6);
+  background: rgba(11, 11, 17, 0.8);
+  border-right: 1px solid rgba(162, 112, 255, 0.1);
   position: relative; 
-  z-index: 100; 
+  z-index: 100; /* Sopra al main content, sotto alle chat windows */
 }
 
 .right-sidebar { 
   grid-area: sidebar-right;
-  border-radius: 5px;
-  padding-right: 10px;
-  background: rgba(11, 11, 17, 0.6);
+  background: rgba(11, 11, 17, 0.8);
+  border-left: 1px solid rgba(162, 112, 255, 0.1);
   position: relative;
   z-index: 100;
 }
 
-/* --- 4. MAIN CONTENT --- */
+/* --- 4. MAIN CONTENT (MAPPA) --- */
 .main-content { 
   grid-area: main-content; 
   position: relative; 
-  border-radius: 5px;
-  overflow: visible; 
   background-color: #09090f;
-  z-index: 1; 
+  z-index: 1; /* Livello più basso */
+  overflow: hidden;
 }
 
-/* --- 5. CONTENT WRAPPER (Solo bordi orizzontali) --- */
 .content-wrapper {
-  max-width: 1520px; max-height: 800px; width: 100%; height: 100%;
-  margin: 0 auto; margin-top: 1.5%; position: relative;
-  padding-top: 5px; padding-bottom: 5px; box-sizing: border-box;
+  max-width: 100%;
+  height: 100%;
+  margin: 0 auto;
+  position: relative;
+  box-sizing: border-box;
 }
 
+/* Bordi decorativi orizzontali per la mappa */
 .content-wrapper::before,
 .content-wrapper::after {
   content: ''; position: absolute; left: 0; right: 0; height: 6px;
   background-image: url('/frames/borderframe.png');
-  background-size: 100% 100%; background-repeat: no-repeat;
-  pointer-events: none; z-index: 50; opacity: 0.8;
+  background-size: 100% 100%;
+  pointer-events: none; z-index: 10;
 }
 .content-wrapper::before { top: 0; }
 .content-wrapper::after { bottom: 0; transform: scaleY(-1); }
 
-
-/* --- 6. UI ELEMENTS --- */
-.event-banner-container {
-  width: 450px; height: 100px; position: relative; border-radius: 14px;
-  border: 1px solid rgba(162, 112, 255, 0.3); overflow: hidden;
-}
-.event-banner-image { width: 100%; height: 100%; object-fit: cover; }
-.event-banner-title {
-  position: absolute; bottom: -15px; right: 15px;
-  font-family: 'goat', sans-serif; color: #ffe7a3; font-size: 2.5rem;
-  text-shadow: 0 0 10px rgba(0,0,0,0.8);
+/* --- 5. FINESTRE CHAT & MODALI (Z-INDEX) --- */
+.chat-windows-area {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* Permette di cliccare attraverso lo sfondo */
+  z-index: 400; /* Sotto l'header ma sopra le sidebar */
 }
 
-.news-visor-container {
-  width: 100%; height: 80px; margin: 20px 0;
-  background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 14px; padding: 10px; box-sizing: border-box;
-  display: flex; flex-direction: column; justify-content: center;
-}
-.news-visor-title {
-  font-family: 'Inter', sans-serif; font-weight: 700; color: #a270ff;
-  font-size: 12px; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px;
-}
-.news-visor-preview {
-  font-family: 'Inter', sans-serif; color: #b3b3c0; font-size: 11px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.chat-windows-area > div {
+  pointer-events: auto; /* Riattiva i click sulle singole finestre */
 }
 
-.sidebar-icon-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 20px; }
-.sidebar-icon-button {
-  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);
-  border-radius: 8px; padding: 10px; cursor: pointer; transition: 0.2s;
-  text-align: center; color: #b3b3c0; font-family: 'Inter', sans-serif; font-size: 10px;
-}
-.sidebar-icon-button:hover { background: rgba(255,255,255,0.08); border-color: #c9a84a; color: white; }
-.sidebar-icon-button img { width: 24px; height: 24px; margin-bottom: 5px; opacity: 0.7; }
-.sidebar-icon-button:hover img { opacity: 1; filter: drop-shadow(0 0 5px #c9a84a); }
-
+/* --- 6. EFFETTI & ANIMAZIONI --- */
 @keyframes gold-pulse {
   0% { box-shadow: 0 0 0 0 rgba(201, 168, 74, 0.4); }
   70% { box-shadow: 0 0 0 10px rgba(201, 168, 74, 0); }
   100% { box-shadow: 0 0 0 0 rgba(201, 168, 74, 0); }
 }
-.new-message-flash { animation: gold-pulse 2s infinite; border-color: #c9a84a; }
+
+.new-message-flash { 
+  animation: gold-pulse 2s infinite; 
+  border: 1px solid #c9a84a !important; 
+}
 
 /* ============================================= */
-/* MOBILE RESPONSIVE TWEAKS (FASE 1)             */
+/* MOBILE RESPONSIVE (MAX 1024px)                */
 /* ============================================= */
-
-/* Quando lo schermo è più piccolo di 1024px (Tablet/Mobile) */
 @media (max-width: 1024px) {
   .game-container {
-    /* Passiamo da 3 colonne a 1 sola colonna centrale */
     grid-template-columns: 1fr;
-    grid-template-rows: 70px 1fr; 
+    grid-template-rows: 80px 1fr; 
     grid-template-areas:
       "header"
       "main-content";
   }
 
-  /* Nascondiamo temporaneamente le sidebar */
-  .left-sidebar, 
-  .right-sidebar {
-    display: none; 
-  }
+  .left-sidebar, .right-sidebar { display: none; }
 
-  /* HEADER MOBILE */
-  .game-header {
-    padding: 0 10px;
-    justify-content: center; 
-  }
-
-  /* Il titolo deve essere molto più piccolo e in alto */
   .game-title {
-    font-size: 2.5rem;
-    top: 5px;
-    width: 100%;
-    text-align: center;
-    position: static; 
+    font-size: 2.2rem;
+    position: relative;
+    top: 0; left: 0;
     transform: none;
-  }
-
-  .event-banner-container, .header-motto, .header-actions {
-    display: none; 
   }
 }

@@ -217,6 +217,11 @@ function SchedaPersonaggio({ user, datiScheda, onClose, targetUser, onOpenChat }
 
     const fetchScheda = useCallback(async () => {
         setLoading(true);
+        // IMPORTANTE: Reset dei dati precedenti per evitare l'effetto "flash" del vecchio utente
+        setFullData(null); 
+        setIsEditMode(false);
+        setPendingUpdates({});
+    
         try {
             let data = datiScheda;
             if (!data) {
@@ -230,7 +235,7 @@ function SchedaPersonaggio({ user, datiScheda, onClose, targetUser, onOpenChat }
             }
             setFullData(data);
             
-            // Inizializza i campi di edit (Profilo e Casa)
+            // Inizializza i campi di edit con i NUOVI dati
             if (user && user.id === data.id_utente) {
                 setEditedProfile({ 
                     avatar: data.avatar || '', 
@@ -238,14 +243,17 @@ function SchedaPersonaggio({ user, datiScheda, onClose, targetUser, onOpenChat }
                     background: data.background || '',
                     cognome: data.cognome || ''
                 });
-                // Inizializza edit casa coi valori attuali (se esistono)
                 setEditedHouse({
                     image: data.house_custom_image || '',
                     desc: data.house_custom_desc || ''
                 });
             }
-        } catch (err) { console.error(err); } finally { setLoading(false); }
-    }, [datiScheda, user, targetUser]);
+        } catch (err) { 
+            console.error(err); 
+        } finally { 
+            setLoading(false); 
+        }
+    }, [datiScheda, user, targetUser]); // targetUser deve essere qui per triggerare il ricaricamento
 
     useEffect(() => { fetchScheda(); }, [fetchScheda]);
 

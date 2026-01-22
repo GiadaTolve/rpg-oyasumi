@@ -110,7 +110,19 @@ function GameLayoutDesktop({ user, onLogout }) {
             />
             
             {/* --- FINESTRE (ORA INCLUSE) --- */}
-            {isSchedaOpen && <SchedaPersonaggio user={user} targetUser={schedaTargetUser} onClose={()=>setIsSchedaOpen(false)} onOpenChat={handleZoneClick} />}
+            {isSchedaOpen && (
+  <SchedaPersonaggio 
+    // Usiamo schedaTargetUser perché è il nome dello stato che hai definito sopra
+    key={schedaTargetUser?.id || user?.id} 
+    user={user} 
+    targetUser={schedaTargetUser} 
+    onClose={() => {
+        setIsSchedaOpen(false);
+        setSchedaTargetUser(null); // Reset fondamentale quando chiudi
+    }} 
+    onOpenChat={handleZoneClick} // Qui usa handleZoneClick che hai già definito
+  />
+)}
             {isBancaOpen && <Banca user={user} onClose={()=>setIsBancaOpen(false)} />}
             {isMessagingOpen && <MessagingManager isVisible={true} onClose={()=>setIsMessagingOpen(false)} isMobile={false} />}
             
