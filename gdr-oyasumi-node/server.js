@@ -2542,20 +2542,24 @@ io.on('connection', async (socket) => {
 // SERVE FRONTEND REACT (RENDER) - FIX DEFINITIVO
 // =============================================
 
-// 1. Servi i file statici
-app.use(express.static(path.join(__dirname, '../gdr-frontend/dist')));
+// Cerchiamo di capire dove si trova la cartella dist
+// Proviamo prima nello stesso livello, poi un livello sopra
+const possiblePath1 = path.join(__dirname, 'dist');
+const possiblePath2 = path.join(__dirname, '../gdr-frontend/dist');
+const frontendPath = require('fs').existsSync(possiblePath1) ? possiblePath1 : possiblePath2;
 
-// 2. Rotta catch-all usando una REGEX PURA
-// Questa regex intercetta tutto tranne ciò che inizia con /api
+console.log(`📂 Servendo file statici da: ${frontendPath}`);
+
+app.use(express.static(frontendPath));
+
 app.get(/^((?!\/api).)*$/, (req, res) => {
-    res.sendFile(path.join(__dirname, '../gdr-frontend/dist/index.html'));
+    const indexPath = path.join(frontendPath, 'index.html');
+    if (require('fs').existsSync(indexPath)) {
+        res.sendFile(indexPath);
+    } else {
+        res.status(404).send("ERRORE CRITICO: Cartella 'dist' o 'index.html' non trovati sul server Render. Controlla i Build Settings.");
+    }
 });
-
-// 3. Fallback di sicurezza per API inesistenti
-app.use('/api', (req, res) => {
-    res.status(404).json({ message: "Endpoint API non trovato." });
-});
-
 
 // --- 5. AVVIO SERVER ---
 (async () => {
