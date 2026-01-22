@@ -2540,8 +2540,9 @@ io.on('connection', async (socket) => {
         socket.disconnect();
     }
 });
+
 // =============================================
-// SERVE FRONTEND REACT (RENDER) - FIX EXPRESS 5
+// SERVE FRONTEND REACT (RENDER) - FIX EXPRESS 5 + NODE 22
 // =============================================
 
 const getFrontendPath = () => {
@@ -2565,23 +2566,45 @@ const getFrontendPath = () => {
 const finalPath = getFrontendPath();
 
 if (finalPath) {
+    // 1. File Statici (immagini, css, js)
     app.use(express.static(finalPath));
 
-    // FIX PER EXPRESS 5: Usa app.use senza path
-    app.use((req, res, next) => {
+    // 2. CATCH-ALL con REGEX OBJECT (/.*/)
+    // Questo è il trucco: passando una Regex vera, evitiamo il crash di Express 5
+    // e catturiamo sicuramente ogni richiesta GET rimasta pendente.
+    app.get(/.*/, (req, res) => {
+        // Se qualcuno cerca un'API che non esiste, diamo 404 JSON
         if (req.url.startsWith('/api')) {
             return res.status(404).json({ message: "API endpoint non trovato" });
         }
+
+        // Per tutto il resto (/forum, /gestione, ecc...), diamo l'index.html
         res.sendFile(path.join(finalPath, 'index.html'), (err) => {
-            if (err && !res.headersSent) {
-                console.error("❌ Errore invio index.html:", err);
-                res.status(500).send("Errore server frontend.");
+            if (err) {
+                console.error("❌ Errore critico invio index.html:", err);
+                if (!res.headersSent) res.status(500).send("Errore caricamento gioco.");
             }
         });
     });
 } else {
-    app.use((req, res) => res.status(500).send("Errore critico: Build frontend mancante."));
+    // Fallback emergenza
+    app.use((req, res) => res.status(500).send("Errore configurazione: Frontend non trovato."));
 }
+
+// --- 5. AVVIO SERVER ---
+(async () => {
+    try {
+        await db.raw('SELECT 1');
+        console.log(`✅ Connessione al database riuscita.`);
+        httpServer.listen(port, () => {
+            console.log(`🚀 Server avviato su porta ${port}`);
+        });
+    } catch (errore) {
+        console.error("ERRORE CRITICO AVVIO SERVER:", errore);
+        process.exit(1);
+    }
+})();
+
 
 
 // --- 5. AVVIO SERVER ---
