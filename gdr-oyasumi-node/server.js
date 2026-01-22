@@ -698,29 +698,43 @@ app.get('/api/admin/users', verificaToken, verificaMod, async (req, res) => {
     res.json(users);
 });
 // [PUT] MODIFICA UTENTE DA ADMIN (Nome, Permesso) - ROTTA MANCANTE AGGIUNTA
-app.put('/api/admin/users/:id', verificaToken, verificaAdmin, async (req, res) => {
-    const targetId = req.params.id;
-    const { nome_pg, permesso } = req.body;
+app.put('/api/admin/users/:id', verificaToken, async (req, res) => {
+    // Solo ADMIN e MOD possono modificare gli utenti
+    if (!['ADMIN', 'MOD'].includes(req.user.permesso)) {
+        return res.status(403).json({ message: "Accesso negato. Permessi insufficienti." });
+    }
+
+    const { id } = req.params;
+    const { nome_pg, email, permesso, password } = req.body;
 
     try {
-        const updateData = {};
-        // Aggiorniamo solo se i dati sono presenti
-        if (nome_pg) updateData.nome_pg = nome_pg;
-        if (permesso) updateData.permesso = permesso;
+        // Prepariamo l'oggetto con i dati da aggiornare
+        const updateData = {
+            nome_pg,
+            email,
+            permesso
+        };
 
-        if (Object.keys(updateData).length === 0) {
-            return res.status(400).json({ message: "Nessun dato da modificare." });
+        // Se è stata fornita una nuova password, dobbiamo criptarla
+        if (password && password.trim() !== "") {
+            const salt = await bcrypt.genSalt(10);
+            const hashedPassword = await bcrypt.hash(password, salt);
+            updateData.password = hashedPassword;
+            console.log(`🔐 Password aggiornata per l'utente ID: ${id}`);
         }
 
-        await db('utenti')
-            .where('id_utente', targetId)
+        const updatedCount = await db('utenti')
+            .where({ id_utente: id })
             .update(updateData);
 
-        res.json({ message: "Utente aggiornato con successo." });
+        if (updatedCount === 0) {
+            return res.status(404).json({ message: "Utente non trovato." });
+        }
 
+        res.json({ message: "Utente aggiornato con successo!" });
     } catch (error) {
-        console.error("Errore modifica admin:", error);
-        res.status(500).json({ message: "Errore interno durante la modifica." });
+        console.error("Errore aggiornamento utente admin:", error);
+        res.status(500).json({ message: "Errore interno del server." });
     }
 });
 
