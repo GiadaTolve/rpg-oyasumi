@@ -2539,26 +2539,42 @@ io.on('connection', async (socket) => {
 });
 
 // =============================================
-// SERVE FRONTEND REACT (RENDER) - FIX DEFINITIVO
+// SERVE FRONTEND REACT (RENDER) - FIX FINALE
 // =============================================
 
-// Cerchiamo di capire dove si trova la cartella dist
-// Proviamo prima nello stesso livello, poi un livello sopra
-const possiblePath1 = path.join(__dirname, 'dist');
-const possiblePath2 = path.join(__dirname, '../gdr-frontend/dist');
-const frontendPath = require('fs').existsSync(possiblePath1) ? possiblePath1 : possiblePath2;
+// Proviamo a determinare il percorso assoluto della cartella dist
+const frontendPath = path.resolve(__dirname, '../../gdr-frontend/dist'); 
+// Nota: aggiungiamo un ../ in più se necessario o usiamo logica dinamica
 
-console.log(`📂 Servendo file statici da: ${frontendPath}`);
+const serveFrontend = () => {
+    const possiblePaths = [
+        path.resolve(__dirname, '../gdr-frontend/dist'),
+        path.resolve(__dirname, '../../gdr-frontend/dist'),
+        path.resolve(process.cwd(), '../gdr-frontend/dist'),
+        path.resolve(process.cwd(), 'gdr-frontend/dist')
+    ];
 
-app.use(express.static(frontendPath));
-
-app.get(/^((?!\/api).)*$/, (req, res) => {
-    const indexPath = path.join(frontendPath, 'index.html');
-    if (require('fs').existsSync(indexPath)) {
-        res.sendFile(indexPath);
-    } else {
-        res.status(404).send("ERRORE CRITICO: Cartella 'dist' o 'index.html' non trovati sul server Render. Controlla i Build Settings.");
+    for (let p of possiblePaths) {
+        if (require('fs').existsSync(path.join(p, 'index.html'))) {
+            console.log(`✅ Frontend trovato in: ${p}`);
+            return p;
+        }
     }
+    console.error("❌ ATTENZIONE: index.html non trovato in nessuno dei percorsi mappati!");
+    return possiblePaths[0];
+};
+
+const finalPath = serveFrontend();
+
+app.use(express.static(finalPath));
+
+// Gestione di TUTTE le rotte non-API
+app.get('*', (req, res, next) => {
+    // Se la richiesta inizia con /api, non mandare l'index.html (lascia andare alle rotte API)
+    if (req.path.startsWith('/api')) {
+        return next();
+    }
+    res.sendFile(path.join(finalPath, 'index.html'));
 });
 
 // --- 5. AVVIO SERVER ---
