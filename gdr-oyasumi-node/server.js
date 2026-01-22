@@ -2574,29 +2574,37 @@ io.on('connection', async (socket) => {
 // --- FINE ROTTE API ---
 // =================================================================
 
-// 3. IL "CATCH-ALL" DEFINITIVO (Middleware Finale)
-// Se la richiesta arriva fin qui, significa che non era un'API e non era un file statico.
-// Quindi DEVE essere una pagina del sito (es. /forum, /gestione).
-app.use((req, res) => {
-    // Debug Log: Vediamo cosa sta chiedendo il browser
-    console.log(`🔍 ROUTING: Richiesta non gestita per ${req.url} - Invio index.html`);
+// 1. Definiamo il percorso in modo secco
+const frontendDist = path.join(__dirname, '../gdr-frontend/dist');
+const indexFile = path.join(frontendDist, 'index.html');
 
-    // Se per qualche motivo chiedono un'API che non esiste, diamo 404 JSON
+console.log("📂 PERCORSO FRONTEND:", frontendDist);
+
+// 2. Serviamo i file statici (JS, CSS, Immagini)
+// Nota: Express controlla prima se il file esiste fisicamente.
+if (require('fs').existsSync(frontendDist)) {
+    app.use(express.static(frontendDist));
+}
+
+// 3. IL "CATCH-ALL" DEFINITIVO (Versione Regex per Express 5)
+// Usiamo new RegExp('.*') per forzare Express a catturare QUALSIASI richiesta GET rimasta.
+app.get(new RegExp('.*'), (req, res) => {
+    
+    // Debug Log: Questo DEVE apparire nei log di Render se visiti /forum
+    console.log(`🔍 SPA ROUTING: Richiesto ${req.url} -> Invio index.html`);
+
+    // Se per sbaglio è una chiamata API, diamo errore JSON per non rompere il client
     if (req.url.startsWith('/api')) {
         return res.status(404).json({ error: "API Endpoint non trovato" });
     }
 
-    // Altrimenti, forziamo l'invio di index.html
-    if (finalPath) {
-        res.sendFile(path.join(finalPath, 'index.html'), (err) => {
-            if (err) {
-                console.error("❌ ERRORE CRITICO invio file:", err);
-                if (!res.headersSent) res.status(500).send("Errore Server: Impossibile caricare il gioco.");
-            }
-        });
-    } else {
-        res.status(500).send("Errore critico: Build frontend non trovata.");
-    }
+    // Per tutto il resto (/forum, /gestione, /scheda) -> Mandiamo index.html
+    res.sendFile(indexFile, (err) => {
+        if (err) {
+            console.error("❌ ERRORE CRITICO invio file:", err);
+            if (!res.headersSent) res.status(500).send("Errore Server: Impossibile caricare il gioco.");
+        }
+    });
 });
 
 // =================================================================
@@ -2609,7 +2617,7 @@ app.use((req, res) => {
         
         httpServer.listen(port, () => {
             console.log(`🚀 SERVER AVVIATO sulla porta ${port}`);
-            console.log(`👉 Pronto a servire il frontend da: ${finalPath}`);
+            console.log(`👉 Pronto a servire il frontend da: ${frontendDist}`);
         });
     } catch (errore) {
         console.error("❌ ERRORE AVVIO:", errore);
