@@ -35,7 +35,7 @@ const db = knex(knexConfig[environment]);
 // =====================================================
 
 const app = express();
-const port = process.env.PORT || 10000; // Ottimizzato per Render
+const port = process.env.PORT || 10000;
 const httpServer = http.createServer(app);
 
 // =====================================================
@@ -77,47 +77,7 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// =====================================================
-// 🔥 FIX CRITICO: FRONTEND STATICO PRIMA DI TUTTO 🔥
-// =====================================================
-
-const getFrontendPath = () => {
-    const possiblePaths = [
-        '/opt/render/project/src/gdr-frontend/dist',
-        path.join(process.cwd(), 'gdr-frontend', 'dist'),
-        path.join(__dirname, '..', 'gdr-frontend', 'dist'),
-        path.join(__dirname, 'dist')
-    ];
-    for (let p of possiblePaths) {
-        if (require('fs').existsSync(path.join(p, 'index.html'))) {
-            console.log(`✅ OYASUMI: Frontend trovato in: ${p}`);
-            return p;
-        }
-    }
-    return null;
-};
-
-const finalPath = getFrontendPath();
-
-// Se il frontend esiste, servilo subito per le risorse statiche (JS/CSS)
-if (finalPath) {
-    // 1. Servi file statici, MA se non trovi il file, passa al prossimo middleware (fallthrough: true è default, ma lo esplicitiamo)
-    app.use(express.static(finalPath, { fallthrough: true })); 
-    
-    // 2. AGGIUNGIAMO SUBITO IL FALLBACK QUI
-    // Qualsiasi richiesta GET che non sia /api e non sia stata trovata come file statico
-    // viene intercettata qui e rimandata all'index.html
-    app.get('*', (req, res, next) => {
-        if (req.url.startsWith('/api') || req.url.startsWith('/socket.io')) {
-            return next(); // Lascia passare le API
-        }
-        console.log(`🔄 SPA REWRITE: ${req.url} -> index.html`);
-        res.sendFile(path.join(finalPath, 'index.html'));
-    });
-}
-
-// ⚠️ NOTA: Ho rimosso 'app.use(verificaToken)' globale perché bloccava il caricamento del sito.
-// Le tue rotte API sono già protette singolarmente (es: app.get(..., verificaToken, ...)).
+// (NOTA: Qui ho rimosso il blocco duplicato del frontend che avevi messo per sbaglio)
 
 // =====================================================
 // --- PERMESSI ---
@@ -219,25 +179,18 @@ const checkRentDue = async (userId) => {
 // --- 10. API PUBBLICHE (LOGIN / REGISTER) ---
 // =====================================================
 
-// Nota: Rimosso route '/' semplice per lasciare spazio al frontend React
-
 // AUTH: REGISTRAZIONE
 app.post('/api/register', async (req, res) => {
     try {
         const { email, password, nome_pg, playerPreferences } = req.body;
         
-        // 1. Validazione input
         if (!email || !password || !nome_pg) {
             return res.status(400).json({ message: 'Tutti i campi sono obbligatori.' });
         }
         
-        // 2. Hash della password
         const hashedPassword = await bcrypt.hash(password, 10);
         
-        // 3. Singola Transazione per DB e Logica Email
         const newUserId = await db.transaction(async (trx) => {
-            
-            // Inserimento utente nel database
             const [userIdResult] = await trx('utenti')
                 .insert({
                     email,
@@ -247,10 +200,8 @@ app.post('/api/register', async (req, res) => {
                 })
                 .returning('id_utente');
 
-            // Normalizzazione ID per PostgreSQL o SQLite
             const userId = (typeof userIdResult === 'object') ? userIdResult.id_utente : userIdResult;
 
-            // --- CONFIGURAZIONE NODEMAILER ---
             const transporter = nodemailer.createTransport({
                 service: 'gmail',
                 auth: {
@@ -268,23 +219,17 @@ app.post('/api/register', async (req, res) => {
                         <h1 style="color: #a270ff; border-bottom: 2px solid #c9a84a; padding-bottom: 10px;">Benvenuto, Sognatore.</h1>
                         <p>La tua registrazione su <strong>Oyasumi</strong> è stata completata con successo.</p>
                         <p>Il tuo personaggio, <strong>${nome_pg}</strong>, è ora pronto per esplorare la realtà che sanguina.</p>
-                        <br />
-                        <p style="font-style: italic; color: #888;">"Ricorda: in questo mondo, il confine tra il sogno e l'incubo è sottile come una lama."</p>
-                        <hr style="border: 0; border-top: 1px solid #31323e; margin: 20px 0;" />
-                        <p style="font-size: 0.8em; color: #666;">Questo è un messaggio automatico dallo staff di Oyasumi.</p>
                     </div>
                 `
             };
 
-            // Invio email (gestito asincrono per non bloccare la risposta HTTP)
             transporter.sendMail(mailOptions).catch(err => {
                 console.error("⚠️ Errore silente invio mail:", err.message);
             });
 
-            return userId; // Restituisce l'ID alla variabile newUserId esterna
+            return userId; 
         });
 
-        // 4. Risposta al client
         res.status(201).json({ 
             message: 'Utente registrato con successo!', 
             userId: newUserId 
@@ -292,37 +237,30 @@ app.post('/api/register', async (req, res) => {
 
     } catch (errore) {
         console.error("❌ Errore durante il processo di registrazione:", errore);
-        
-        // Gestione duplicati (Email già esistente)
         if (errore.code === '23505' || errore.code === 'SQLITE_CONSTRAINT') {
             return res.status(409).json({ message: 'Questa email è già stata utilizzata.' });
         }
-        
         res.status(500).json({ message: 'Errore interno del server durante la registrazione.' });
     }
 });
 
-// ==========================================
-// 📦 SETUP OGGETTI & INVENTARIO (Rotta Temporanea)
-// ==========================================
+// SETUP ITEMS (Rotta Temporanea)
 app.get('/api/setup-items', async (req, res) => {
     try {
         console.log("📦 Inizio setup inventario...");
 
-        // 1. CREAZIONE TABELLA 'oggetti' (se manca)
         if (!(await db.schema.hasTable('oggetti'))) {
             await db.schema.createTable('oggetti', (table) => {
                 table.increments('id').primary();
                 table.string('nome').notNullable();
                 table.string('descrizione');
-                table.string('icona'); // Es: /icone/pozione.png
+                table.string('icona'); 
                 table.string('tipo').defaultTo('GENERICO');
                 table.float('peso').defaultTo(0);
             });
             console.log("✅ Tabella 'oggetti' creata.");
         }
 
-        // 2. CREAZIONE TABELLA 'inventario' (se manca)
         if (!(await db.schema.hasTable('inventario'))) {
             await db.schema.createTable('inventario', (table) => {
                 table.increments('id').primary();
@@ -334,7 +272,6 @@ app.get('/api/setup-items', async (req, res) => {
         }
 
         await db.transaction(async (trx) => {
-            // 3. POPOLIAMO GLI OGGETTI (Upsert manuale)
             const oggettiBase = [
                 { id: 1, nome: 'Pozione Curativa', descrizione: 'Restituisce 10 PF', icona: 'https://i.imgur.com/Xq7tX1h.png', tipo: 'CONSUMABILE' },
                 { id: 2, nome: 'Katana Arrugginita', descrizione: 'Vecchia lama.', icona: 'https://i.imgur.com/2b3m4zL.png', tipo: 'ARMA' },
@@ -342,19 +279,15 @@ app.get('/api/setup-items', async (req, res) => {
             ];
 
             for (const obj of oggettiBase) {
-                // Controlla se esiste, se no lo crea
                 const exists = await trx('oggetti').where('id', obj.id).first();
                 if (!exists) {
                     await trx('oggetti').insert(obj);
                 }
             }
 
-            // 4. ASSEGNA OGGETTI AL PRIMO UTENTE (Probabilmente TU)
-            // Cerchiamo il primo utente nel DB
             const primoUtente = await trx('utenti').orderBy('id_utente', 'asc').first();
             
             if (primoUtente) {
-                // Diamo 5 Pozioni
                 const invExists = await trx('inventario').where({ user_id: primoUtente.id_utente, item_id: 1 }).first();
                 if (!invExists) {
                     await trx('inventario').insert({ user_id: primoUtente.id_utente, item_id: 1, quantita: 5 });
@@ -407,15 +340,12 @@ app.get('/api/users/find', verificaToken, async (req, res) => {
     if (!name) return res.status(400).json({ message: 'Il nome del personaggio è richiesto.' });
 
     try {
-        // --- MODIFICA QUI ---
-        // Prima cercava match esatto (=). Ora cerca parziale (LIKE %...%)
         const users = await db('utenti')
             .select('id_utente', 'nome_pg', 'avatar_chat')
             .whereRaw('LOWER(nome_pg) LIKE LOWER(?)', [`${name}%`])
             .andWhere('id_utente', '!=', myId)
-            .limit(5); // Limitiamo a 5 suggerimenti
+            .limit(5); 
 
-        // Restituiamo un array, non un singolo oggetto
         res.json(users); 
 
     } catch (error) {
@@ -424,11 +354,9 @@ app.get('/api/users/find', verificaToken, async (req, res) => {
     }
 });
 
-// API MANUALE (Se il frontend cerca di scaricare testi dinamici)
+// API MANUALE
 app.get('/api/manuale', async (req, res) => {
     try {
-        // Se non hai una tabella manuale, restituiamo un oggetto vuoto per non far crashare il frontend
-        // Se invece hai creato una tabella 'manuale_sezioni', usa: await db('manuale_sezioni').select('*');
         res.json({ content: "Manuale in caricamento..." }); 
     } catch (e) {
         res.status(500).json({ message: "Errore manuale." });
@@ -453,20 +381,18 @@ app.get('/api/scheda', verificaToken, async (req, res) => {
     }
 });
   
-// [GET] SCHEDA PUBBLICA (Per vedere gli altri utenti)
-
+// [GET] SCHEDA PUBBLICA 
 app.get('/api/scheda/:id', verificaToken, async (req, res) => {
     try {
         const targetId = req.params.id;
-        const requesterPerm = req.utente.permesso; // Chi sta chiedendo?
+        const requesterPerm = req.utente.permesso; 
         const isStaff = ['ADMIN', 'MOD', 'MASTER'].includes(requesterPerm);
 
-        // Join con housing_types per avere il nome della casa
         const scheda = await db('utenti')
             .leftJoin('housing_types', 'utenti.housing_id', 'housing_types.id')
             .select(
                 'utenti.*',
-                'housing_types.name as house_name', // Nome generico casa
+                'housing_types.name as house_name',
                 'housing_types.id as house_type_id'
             )
             .where('utenti.id_utente', targetId)
@@ -474,19 +400,13 @@ app.get('/api/scheda/:id', verificaToken, async (req, res) => {
       
         if (!scheda) return res.status(404).json({ message: 'Scheda non trovata.' });
   
-        // PULIZIA DATI
         delete scheda.password;
         delete scheda.email; 
         
-        // SICUREZZA CASA:
-        // L'ID della chat casa è segreto. Lo mandiamo solo se:
-        // 1. È l'utente stesso (ma questa è la rotta pubblica, quindi raro)
-        // 2. Chi richiede è STAFF (Irruzione)
         if (!isStaff && req.utente.id !== scheda.id_utente) {
             delete scheda.house_chat_id; 
         }
         
-        // Calcolo livello
         if (typeof calculateLevel === 'function') {
             scheda.livello = calculateLevel(scheda.exp_accumulata);
         } else {
@@ -506,7 +426,7 @@ app.get('/api/scheda/:id', verificaToken, async (req, res) => {
 app.post('/api/admin/users/:id/ban', verificaToken, verificaMod, async (req, res) => {
     const targetUserId = req.params.id;
     const { days, reason, type } = req.body; 
-    const adminName = req.utente.nome_pg; // Chi sta bannando?
+    const adminName = req.utente.nome_pg; 
 
     if (!days || !reason) return res.status(400).json({ message: "Dati mancanti." });
 
@@ -517,14 +437,12 @@ app.post('/api/admin/users/:id/ban', verificaToken, verificaMod, async (req, res
         banDate.setDate(banDate.getDate() + parseInt(days));
 
         await db.transaction(async (trx) => {
-            // 1. Applica il Ban all'utente
             await trx('utenti').where('id_utente', targetUserId).update({
                 ban_expires_at: banDate,
                 ban_reason: reason,
                 ban_type: banType
             });
 
-            // 2. Scrivi nel registro storico (Log Sanzioni)
             await trx('user_sanctions').insert({
                 user_id: targetUserId,
                 admin_name: adminName,
@@ -534,7 +452,6 @@ app.post('/api/admin/users/:id/ban', verificaToken, verificaMod, async (req, res
             });
         });
 
-        // Disconnessione forzata se FULL
         if (banType === 'FULL') {
             const socketId = userSockets.get(Number(targetUserId));
             if (socketId) io.sockets.sockets.get(socketId)?.disconnect(true);
@@ -547,7 +464,7 @@ app.post('/api/admin/users/:id/ban', verificaToken, verificaMod, async (req, res
     }
 });
 
-// [POST] UNBAN UTENTE (Per sbannare prima del tempo)
+// [POST] UNBAN UTENTE 
 app.post('/api/admin/users/:id/unban', verificaToken, verificaMod, async (req, res) => {
     try {
         await db('utenti').where('id_utente', req.params.id).update({
@@ -562,7 +479,7 @@ app.post('/api/admin/users/:id/unban', verificaToken, verificaMod, async (req, r
     }
 });
 
-// [GET] RECUPERA STORICO SANZIONI (Visibile solo allo Staff)
+// [GET] RECUPERA STORICO SANZIONI
 app.get('/api/admin/users/:id/sanctions', verificaToken, verificaMod, async (req, res) => {
     try {
         const history = await db('user_sanctions')
@@ -575,7 +492,7 @@ app.get('/api/admin/users/:id/sanctions', verificaToken, verificaMod, async (req
     }
 });
 
-// [POST] AGGIORNA STATISTICHE (Versione con Arrotondamento)
+// [POST] AGGIORNA STATISTICHE 
 app.post('/api/scheda/aggiorna-stat', verificaToken, async (req, res) => {
     const { updates } = req.body;
     const userId = req.utente.id;
@@ -599,9 +516,6 @@ app.post('/api/scheda/aggiorna-stat', verificaToken, async (req, res) => {
             
             for (const stat in updates) {
                 if (validStats.includes(stat)) {
-                    // --- CORREZIONE FONDAMENTALE ---
-                    // Arrotondiamo il numero all'intero più vicino (es. 12.5 -> 13)
-                    // Questo impedisce l'errore "invalid input syntax for type integer"
                     datiDaSalvare[stat] = Math.round(Number(updates[stat]));
                 }
             }
@@ -630,19 +544,14 @@ app.post('/api/scheda/aggiorna-stat', verificaToken, async (req, res) => {
     }
 });
 
-// =======================================================
-// [AGGIORNAMENTO PROFILO ROBUSTO] (Gestisce PUT e POST)
-// =======================================================
-
+// AGGIORNAMENTO PROFILO
 const gestisciAggiornamentoProfilo = async (req, res) => {
     console.log("📩 Tentativo aggiornamento profilo per:", req.utente.nome_pg);
     
-    // Estraiamo i dati. NOTA: Il nome_pg e il permesso NON si cambiano da qui per sicurezza.
     const { avatar, avatar_chat, background, cognome } = req.body;
     const userId = req.utente.id;
 
     try {
-        // Eseguiamo l'aggiornamento
         await db('utenti')
             .where('id_utente', userId)
             .update({ 
@@ -652,18 +561,13 @@ const gestisciAggiornamentoProfilo = async (req, res) => {
                 cognome 
             });
 
-        // Recuperiamo la scheda aggiornata per rimandarla al frontend
         const schedaAggiornata = await db('utenti').where('id_utente', userId).first();
         
         if (schedaAggiornata) {
             delete schedaAggiornata.password;
-            
-            // Ricalcolo livello se necessario
             if (typeof calculateLevel === 'function') {
                 schedaAggiornata.livello = calculateLevel(schedaAggiornata.exp_accumulata);
             }
-            
-            console.log("✅ Profilo aggiornato con successo!");
             res.status(200).json(schedaAggiornata);
         } else {
             res.status(404).json({ message: "Utente non trovato nel DB." });
@@ -675,18 +579,15 @@ const gestisciAggiornamentoProfilo = async (req, res) => {
     }
 };
 
-// Colleghiamo la funzione a ENTRAMBI i metodi per sicurezza
 app.put('/api/scheda/profilo', verificaToken, gestisciAggiornamentoProfilo);
 app.post('/api/scheda/profilo', verificaToken, gestisciAggiornamentoProfilo);
 
-// BANNER (Supporta sia active-event che active-banner per sicurezza)
+// BANNER 
 app.get(['/api/active-event', '/api/active-banner'], async (req, res) => {
     try {
         const event = await db('events')
             .where({ is_active: 1 })
             .first();
-
-        // Restituisce l'evento o null (senza crashare)
         res.json(event || null);
     } catch (e) {
         console.error("Errore evento attivo:", e);
@@ -721,48 +622,34 @@ app.get('/api/weather', verificaToken, async (req, res) => {
     try {
         const response = await axios.get(url);
         const data = response.data;
-        // ... logica icone ...
         res.json({
             temp: Math.round(data.main.temp),
             description: data.weather[0].description,
-            icon: 'sun.png' // Semplificato
+            icon: 'sun.png' 
         });
     } catch (error) {
         res.status(500).json({ message: 'Impossibile recuperare i dati meteo.' });
     }
 });
 
-// ADMIN ROUTES (Users, Locations, etc.)
-
+// ADMIN ROUTES 
 app.get('/api/admin/users', verificaToken, verificaMod, async (req, res) => {
     const users = await db('utenti').select('id_utente', 'email', 'nome_pg', 'permesso');
     res.json(users);
 });
 
-// [PUT] MODIFICA UTENTE DA ADMIN (Nome, Email, Permesso, Password)
-// Usiamo verificaMod perché permette l'accesso sia a MOD che ad ADMIN
 app.put('/api/admin/users/:id', verificaToken, verificaMod, async (req, res) => {
     const { id } = req.params;
     const { nome_pg, email, permesso, password } = req.body;
 
-    console.log(`📡 Richiesta modifica utente ID ${id} da parte di ${req.utente.nome_pg}`);
-
     try {
-        // 1. Prepariamo l'oggetto con i dati base
-        const updateData = {
-            nome_pg,
-            email,
-            permesso
-        };
+        const updateData = { nome_pg, email, permesso };
 
-        // 2. Se è stata fornita una nuova password, facciamo l'hash
         if (password && password.trim() !== "") {
-            console.log("🔐 Generazione hash per nuova password...");
             const salt = await bcrypt.genSalt(10);
             updateData.password = await bcrypt.hash(password, salt);
         }
 
-        // 3. Esecuzione aggiornamento sul DB
         const updatedCount = await db('utenti')
             .where({ id_utente: id })
             .update(updateData);
@@ -770,8 +657,6 @@ app.put('/api/admin/users/:id', verificaToken, verificaMod, async (req, res) => 
         if (updatedCount === 0) {
             return res.status(404).json({ message: "Utente non trovato nel database." });
         }
-
-        console.log(`✅ Utente ID ${id} aggiornato con successo.`);
         res.json({ message: "Dati utente aggiornati correttamente!" });
 
     } catch (error) {
@@ -787,13 +672,11 @@ app.put('/api/admin/users/:id', verificaToken, verificaMod, async (req, res) => 
 // --- BLOCCO 1: ADMIN BANNERS (CRUD COMPLETO) ---
 // =====================================================
 
-// GET — Lista banner (pannello gestione)
 app.get('/api/admin/banners', verificaToken, verificaMod, async (req, res) => {
     try {
         const banners = await db('event_banners')
             .select('*')
-            .orderBy('id', 'desc'); // 🔒 niente created_at
-
+            .orderBy('id', 'desc');
         res.status(200).json(Array.isArray(banners) ? banners : []);
     } catch (error) {
         console.error("❌ Errore GET admin banners:", error);
@@ -802,78 +685,52 @@ app.get('/api/admin/banners', verificaToken, verificaMod, async (req, res) => {
 });
 
 
-// POST — Crea nuovo banner
 app.post('/api/admin/banners', verificaToken, verificaMod, async (req, res) => {
     const { title, image_url, link_url, is_active } = req.body;
 
     try {
         await db.transaction(async (trx) => {
-
-            // 👉 Se il nuovo banner è attivo, disattiviamo tutti gli altri
             if (is_active) {
                 await trx('event_banners').update({ is_active: 0 });
             }
-
             await trx('event_banners').insert({
-                title,
-                image_url,
-                link_url,
-                is_active: is_active ? 1 : 0
+                title, image_url, link_url, is_active: is_active ? 1 : 0
             });
         });
-
         res.json({ message: "Banner creato con successo." });
-
     } catch (error) {
         console.error("Errore POST admin banner:", error);
         res.status(500).json({ message: "Errore creazione banner." });
     }
 });
 
-// PUT — Modifica banner
 app.put('/api/admin/banners/:id', verificaToken, verificaMod, async (req, res) => {
     const { id } = req.params;
     const { title, image_url, link_url, is_active } = req.body;
 
     try {
         await db.transaction(async (trx) => {
-
-            // 👉 Se lo stiamo attivando, spegniamo gli altri
             if (is_active) {
                 await trx('event_banners')
                     .whereNot('id', id)
                     .update({ is_active: 0 });
             }
-
             await trx('event_banners')
                 .where({ id })
-                .update({
-                    title,
-                    image_url,
-                    link_url,
-                    is_active: is_active ? 1 : 0
-                });
+                .update({ title, image_url, link_url, is_active: is_active ? 1 : 0 });
         });
-
         res.json({ message: "Banner aggiornato." });
-
     } catch (error) {
         console.error("Errore PUT admin banner:", error);
         res.status(500).json({ message: "Errore aggiornamento banner." });
     }
 });
 
-// DELETE — Elimina banner
 app.delete('/api/admin/banners/:id', verificaToken, verificaMod, async (req, res) => {
     const { id } = req.params;
-
     try {
-        await db('event_banners')
-            .where({ id })
-            .del();
-
+        await db('event_banners').where({ id }).del();
         res.json({ message: "Banner eliminato." });
-
     } catch (error) {
         console.error("Errore DELETE admin banner:", error);
         res.status(500).json({ message: "Errore eliminazione banner." });
@@ -886,10 +743,7 @@ app.delete('/api/admin/banners/:id', verificaToken, verificaMod, async (req, res
 
 app.get('/api/admin/locations', verificaToken, verificaMod, async (req, res) => {
     try {
-        const locations = await db('locations')
-            .select('*')
-            .orderBy('id', 'asc'); // 🔒 sicuro
-
+        const locations = await db('locations').select('*').orderBy('id', 'asc');
         res.json(locations);
     } catch (error) {
         console.error("❌ Errore GET admin locations:", error);
@@ -898,33 +752,18 @@ app.get('/api/admin/locations', verificaToken, verificaMod, async (req, res) => 
 });
 
 app.post('/api/admin/locations', verificaToken, verificaMod, async (req, res) => {
-    const {
-        name,
-        type,
-        parent_id,
-        image_url,
-        description,
-        pos_x,
-        pos_y,
-        prefecture
-    } = req.body;
+    const { name, type, parent_id, image_url, description, pos_x, pos_y, prefecture } = req.body;
 
     try {
         const [idResult] = await db('locations')
             .insert({
-                name,
-                type,                 // 'MAP' o 'CHAT'
-                parent_id: parent_id ?? null,
-                image_url: image_url ?? null,
-                description: description ?? null,
-                pos_x: pos_x ?? null,
-                pos_y: pos_y ?? null,
-                prefecture: prefecture ?? null
+                name, type, parent_id: parent_id ?? null,
+                image_url: image_url ?? null, description: description ?? null,
+                pos_x: pos_x ?? null, pos_y: pos_y ?? null, prefecture: prefecture ?? null
             })
             .returning('id');
 
         const newId = typeof idResult === 'object' ? idResult.id : idResult;
-
         res.status(201).json({ id: newId });
     } catch (error) {
         console.error("❌ Errore CREATE location:", error);
@@ -932,44 +771,20 @@ app.post('/api/admin/locations', verificaToken, verificaMod, async (req, res) =>
     }
 });
 
-// [PUT] AGGIORNAMENTO LOCATION (MAPPA/CHAT) DA ADMIN
 app.put('/api/admin/locations/:id', verificaToken, verificaMod, async (req, res) => {
     const { id } = req.params;
-    
-    // Estraiamo solo i campi che il database possiede realmente
-    // Questo evita errori se il frontend manda dati extra (come i figli della mappa)
-    const { 
-        name, 
-        image_url, 
-        description, 
-        pos_x, 
-        pos_y, 
-        prefecture, 
-        type, 
-        parent_id 
-    } = req.body;
+    const { name, image_url, description, pos_x, pos_y, prefecture, type, parent_id } = req.body;
 
     try {
         const updateData = {
-            name,
-            image_url,
-            description,
-            pos_x: pos_x ? Number(pos_x) : null,
-            pos_y: pos_y ? Number(pos_y) : null,
-            prefecture,
-            type,
-            parent_id: parent_id || null
+            name, image_url, description,
+            pos_x: pos_x ? Number(pos_x) : null, pos_y: pos_y ? Number(pos_y) : null,
+            prefecture, type, parent_id: parent_id || null
         };
 
-        const result = await db('locations')
-            .where({ id })
-            .update(updateData);
+        const result = await db('locations').where({ id }).update(updateData);
 
-        if (result === 0) {
-            return res.status(404).json({ message: "Location non trovata." });
-        }
-
-        console.log(`🗺️ Mappa/Chat aggiornata: ID ${id} (${name})`);
+        if (result === 0) return res.status(404).json({ message: "Location non trovata." });
         res.json({ message: "Modifiche salvate con successo!" });
 
     } catch (error) {
@@ -983,12 +798,7 @@ app.put('/api/admin/locations/:id/parent', verificaToken, verificaMod, async (re
     const { newParentId } = req.body;
 
     try {
-        await db('locations')
-            .where({ id })
-            .update({
-                parent_id: newParentId ?? null
-            });
-
+        await db('locations').where({ id }).update({ parent_id: newParentId ?? null });
         res.json({ message: "Parent aggiornato." });
     } catch (error) {
         console.error("❌ Errore cambio parent:", error);
@@ -998,7 +808,6 @@ app.put('/api/admin/locations/:id/parent', verificaToken, verificaMod, async (re
 
 app.delete('/api/admin/locations/:id', verificaToken, verificaAdmin, async (req, res) => {
     const { id } = req.params;
-
     try {
         await db('locations').where({ id }).del();
         res.json({ message: "Location eliminata." });
@@ -1014,8 +823,7 @@ app.delete('/api/admin/locations/:id', verificaToken, verificaAdmin, async (req,
 
 app.get('/api/admin/forum/sezioni', verificaToken, verificaMod, async (req, res) => {
     try {
-        const sezioni = await db('forum_sezioni')
-            .orderBy('ordine', 'asc');
+        const sezioni = await db('forum_sezioni').orderBy('ordine', 'asc');
         res.json(sezioni);
     } catch (e) {
         console.error("Errore get sezioni:", e);
@@ -1026,13 +834,8 @@ app.get('/api/admin/forum/sezioni', verificaToken, verificaMod, async (req, res)
 
 app.post('/api/admin/forum/sezioni', verificaToken, verificaMod, async (req, res) => {
     const { titolo, descrizione, ordine } = req.body;
-
     try {
-        await db('forum_sezioni').insert({
-            titolo,
-            descrizione,
-            ordine: ordine ?? 0
-        });
+        await db('forum_sezioni').insert({ titolo, descrizione, ordine: ordine ?? 0 });
         res.status(201).json({ message: "Sezione creata." });
     } catch (e) {
         console.error("Errore crea sezione:", e);
@@ -1042,9 +845,7 @@ app.post('/api/admin/forum/sezioni', verificaToken, verificaMod, async (req, res
 
 app.put('/api/admin/forum/sezioni/:id', verificaToken, verificaMod, async (req, res) => {
     try {
-        await db('forum_sezioni')
-            .where({ id: req.params.id })
-            .update(req.body);
+        await db('forum_sezioni').where({ id: req.params.id }).update(req.body);
         res.json({ message: "Sezione aggiornata." });
     } catch (e) {
         console.error("Errore update sezione:", e);
@@ -1064,8 +865,7 @@ app.delete('/api/admin/forum/sezioni/:id', verificaToken, verificaAdmin, async (
 
 app.get('/api/admin/forum/bacheche', verificaToken, verificaMod, async (req, res) => {
     try {
-        const bacheche = await db('forum_bacheche')
-            .orderBy('ordine', 'asc');
+        const bacheche = await db('forum_bacheche').orderBy('ordine', 'asc');
         res.json(bacheche);
     } catch (e) {
         console.error("Errore get bacheche:", e);
@@ -1075,14 +875,8 @@ app.get('/api/admin/forum/bacheche', verificaToken, verificaMod, async (req, res
 
 app.post('/api/admin/forum/bacheche', verificaToken, verificaMod, async (req, res) => {
     const { sezione_id, titolo, descrizione, ordine } = req.body;
-
     try {
-        await db('forum_bacheche').insert({
-            sezione_id,
-            titolo,
-            descrizione,
-            ordine: ordine ?? 0
-        });
+        await db('forum_bacheche').insert({ sezione_id, titolo, descrizione, ordine: ordine ?? 0 });
         res.status(201).json({ message: "Bacheca creata." });
     } catch (e) {
         console.error("Errore crea bacheca:", e);
@@ -1092,9 +886,7 @@ app.post('/api/admin/forum/bacheche', verificaToken, verificaMod, async (req, re
 
 app.put('/api/admin/forum/bacheche/:id', verificaToken, verificaMod, async (req, res) => {
     try {
-        await db('forum_bacheche')
-            .where({ id: req.params.id })
-            .update(req.body);
+        await db('forum_bacheche').where({ id: req.params.id }).update(req.body);
         res.json({ message: "Bacheca aggiornata." });
     } catch (e) {
         console.error("Errore update bacheca:", e);
@@ -1114,8 +906,7 @@ app.delete('/api/admin/forum/bacheche/:id', verificaToken, verificaAdmin, async 
 
 app.get('/api/admin/forum/topics', verificaToken, verificaMod, async (req, res) => {
     try {
-        const topics = await db('forum_topics')
-            .orderBy('ultimo_post_timestamp', 'desc');
+        const topics = await db('forum_topics').orderBy('ultimo_post_timestamp', 'desc');
         res.json(topics);
     } catch (e) {
         console.error("Errore get topics admin:", e);
@@ -1153,8 +944,7 @@ app.delete('/api/admin/forum/posts/:id', verificaToken, verificaMod, async (req,
 
 app.get('/api/admin/events', verificaToken, verificaMod, async (req, res) => {
     try {
-        const events = await db('events')
-            .orderBy('data_inizio', 'desc');
+        const events = await db('events').orderBy('data_inizio', 'desc');
         res.json(events);
     } catch (e) {
         console.error("Errore get events:", e);
@@ -1164,20 +954,11 @@ app.get('/api/admin/events', verificaToken, verificaMod, async (req, res) => {
 
 app.post('/api/admin/events', verificaToken, verificaMod, async (req, res) => {
     const { titolo, descrizione, data_inizio, data_fine } = req.body;
-
     if (!titolo || !data_inizio) {
         return res.status(400).json({ message: "Titolo e data inizio obbligatori." });
     }
-
     try {
-        await db('events').insert({
-            titolo,
-            descrizione,
-            data_inizio,
-            data_fine,
-            is_active: 0
-        });
-
+        await db('events').insert({ titolo, descrizione, data_inizio, data_fine, is_active: 0 });
         res.status(201).json({ message: "Evento creato." });
     } catch (e) {
         console.error("Errore crea evento:", e);
@@ -1187,10 +968,7 @@ app.post('/api/admin/events', verificaToken, verificaMod, async (req, res) => {
 
 app.put('/api/admin/events/:id', verificaToken, verificaMod, async (req, res) => {
     try {
-        await db('events')
-            .where({ id: req.params.id })
-            .update(req.body);
-
+        await db('events').where({ id: req.params.id }).update(req.body);
         res.json({ message: "Evento aggiornato." });
     } catch (e) {
         console.error("Errore update evento:", e);
@@ -1201,15 +979,9 @@ app.put('/api/admin/events/:id', verificaToken, verificaMod, async (req, res) =>
 app.put('/api/admin/events/:id/activate', verificaToken, verificaMod, async (req, res) => {
     try {
         await db.transaction(async (trx) => {
-            // Disattiva tutti
             await trx('events').update({ is_active: 0 });
-
-            // Attiva solo questo
-            await trx('events')
-                .where({ id: req.params.id })
-                .update({ is_active: 1 });
+            await trx('events').where({ id: req.params.id }).update({ is_active: 1 });
         });
-
         res.json({ message: "Evento attivato (unico attivo)." });
     } catch (e) {
         console.error("Errore attiva evento:", e);
@@ -1219,10 +991,7 @@ app.put('/api/admin/events/:id/activate', verificaToken, verificaMod, async (req
 
 app.delete('/api/admin/events/:id', verificaToken, verificaAdmin, async (req, res) => {
     try {
-        await db('events')
-            .where({ id: req.params.id })
-            .del();
-
+        await db('events').where({ id: req.params.id }).del();
         res.json({ message: "Evento eliminato." });
     } catch (e) {
         console.error("Errore delete evento:", e);
@@ -1285,50 +1054,11 @@ app.get('/api/forum', verificaToken, async (req, res) => {
       // 2. BACHECHE + METADATI
       const bacheche = await db('forum_bacheche as b')
         .select(
-          'b.id',
-          'b.sezione_id',
-          'b.nome',
-          'b.descrizione',
-          'b.ordine',
-          'b.is_locked',
-  
-          // numero topic
-          db.raw(
-            '(SELECT COUNT(*) FROM forum_topics t WHERE t.bacheca_id = b.id) AS topic_count'
-          ),
-  
-          // timestamp ultimo post
-          db.raw(
-            `(SELECT MAX(ultimo_post_timestamp)
-              FROM forum_topics t
-              WHERE t.bacheca_id = b.id) AS last_post_timestamp`
-          ),
-  
-          // autore ultimo post
-          db.raw(
-            `(SELECT u.nome_pg
-              FROM forum_topics t
-              JOIN forum_posts p ON p.topic_id = t.id
-              JOIN utenti u ON u.id_utente = p.autore_id
-              WHERE t.bacheca_id = b.id
-              ORDER BY p.timestamp_creazione DESC
-              LIMIT 1) AS last_post_author`
-          ),
-  
-          // nuovi messaggi?
-          db.raw(
-            `(SELECT EXISTS (
-                SELECT 1
-                FROM forum_topics t
-                LEFT JOIN forum_topic_reads r
-                  ON r.topic_id = t.id
-                  AND r.user_id = ?
-                WHERE t.bacheca_id = b.id
-                  AND t.ultimo_post_timestamp >
-                      COALESCE(r.last_read_timestamp, TIMESTAMP '1970-01-01')
-            )) AS has_new_posts`,
-            [userId]
-          )
+          'b.id', 'b.sezione_id', 'b.nome', 'b.descrizione', 'b.ordine', 'b.is_locked',
+          db.raw('(SELECT COUNT(*) FROM forum_topics t WHERE t.bacheca_id = b.id) AS topic_count'),
+          db.raw(`(SELECT MAX(ultimo_post_timestamp) FROM forum_topics t WHERE t.bacheca_id = b.id) AS last_post_timestamp`),
+          db.raw(`(SELECT u.nome_pg FROM forum_topics t JOIN forum_posts p ON p.topic_id = t.id JOIN utenti u ON u.id_utente = p.autore_id WHERE t.bacheca_id = b.id ORDER BY p.timestamp_creazione DESC LIMIT 1) AS last_post_author`),
+          db.raw(`(SELECT EXISTS (SELECT 1 FROM forum_topics t LEFT JOIN forum_topic_reads r ON r.topic_id = t.id AND r.user_id = ? WHERE t.bacheca_id = b.id AND t.ultimo_post_timestamp > COALESCE(r.last_read_timestamp, TIMESTAMP '1970-01-01'))) AS has_new_posts`, [userId])
         )
         .orderBy('b.ordine', 'asc');
   
@@ -1342,10 +1072,7 @@ app.get('/api/forum', verificaToken, async (req, res) => {
   
     } catch (error) {
       console.error('❌ ERRORE /api/forum:', error.message);
-      res.status(500).json({
-        message: 'Errore interno forum',
-        error: error.message
-      });
+      res.status(500).json({ message: 'Errore interno forum', error: error.message });
     }
   });
 
@@ -1381,39 +1108,24 @@ app.get('/api/forum/topic/:topicId', verificaToken, async (req, res) => {
         const posts = await db('forum_posts as p')
     .join('utenti as u', 'p.autore_id', 'u.id_utente')
     .select(
-        'p.*',
-        'u.nome_pg as autore_nome',
-        'u.permesso as autore_permesso',
+        'p.*', 'u.nome_pg as autore_nome', 'u.permesso as autore_permesso',
         db.raw("COALESCE(u.avatar_chat, '/icone/mini_avatar.png') as autore_avatar_url"),
-        db.raw(
-'(SELECT COUNT(*)::int FROM forum_post_likes WHERE post_id = p.id) as like_count'
-          ),          
-        db.raw(
-            'EXISTS(SELECT 1 FROM forum_post_likes WHERE post_id = p.id AND user_id = ?) as user_has_liked',
-            [userId]
-        ),
+        db.raw('(SELECT COUNT(*)::int FROM forum_post_likes WHERE post_id = p.id) as like_count'),          
+        db.raw('EXISTS(SELECT 1 FROM forum_post_likes WHERE post_id = p.id AND user_id = ?) as user_has_liked', [userId]),
     )
     .where('p.topic_id', topicId)
     .orderBy('p.timestamp_creazione', 'asc');
 
-        
-            await db('forum_topic_reads')
-    .insert({
-        user_id: userId,
-        topic_id: topicId,
-        last_read_timestamp: db.fn.now()
-    })
-    .onConflict(['user_id', 'topic_id'])
-    .merge({
-        last_read_timestamp: db.fn.now()
-    });
-
+    await db('forum_topic_reads')
+        .insert({ user_id: userId, topic_id: topicId, last_read_timestamp: db.fn.now() })
+        .onConflict(['user_id', 'topic_id'])
+        .merge({ last_read_timestamp: db.fn.now() });
 
         res.json({ ...topic, posts });
     } catch (error) { res.status(500).json({ message: "Errore." }); }
 });
 
-// CRUD Topics/Posts (Semplificato ma funzionale)
+// CRUD Topics/Posts 
 app.post('/api/forum/topics', verificaToken, async (req, res) => {
     const { bacheca_id, titolo, testo } = req.body;
     const autore_id = req.utente.id;
@@ -1443,68 +1155,43 @@ app.post('/api/forum/posts', verificaToken, async (req, res) => {
 // [POST] SEGNA INTERA BACHECA COME LETTA
 app.post('/api/forum/mark-all-as-read', verificaToken, async (req, res) => {
     const userId = req.utente.id;
-
     try {
-        // 1. Recuperiamo gli ID di TUTTI i topic esistenti nel forum
         const topics = await db('forum_topics').select('id');
+        if (topics.length === 0) return res.json({ message: 'Nessun topic da segnare.' });
 
-        if (topics.length === 0) {
-            return res.json({ message: 'Nessun topic da segnare.' });
-        }
-
-        // 2. Prepariamo i dati per l'inserimento massivo
         const readsToInsert = topics.map(t => ({
             user_id: userId,
             topic_id: t.id,
             last_read_timestamp: db.fn.now()
         }));
 
-        // 3. Eseguiamo l'Upsert (Inserisci o Aggiorna se esiste)
-        // Questo aggiorna la data di lettura per TUTTI i topic per questo utente
         await db('forum_topic_reads')
             .insert(readsToInsert)
             .onConflict(['user_id', 'topic_id'])
             .merge();
 
         res.json({ message: 'Tutto il forum segnato come letto.' });
-
     } catch (error) {
         console.error("Errore mark all read:", error);
         res.status(500).json({ message: "Errore interno." });
     }
 });
 
-// ==============================
-// ❤️ TOGGLE LIKE POST FORUM
-// ==============================
+// TOGGLE LIKE
 app.post('/api/forum/posts/:postId/like', verificaToken, async (req, res) => {
     const postId = Number(req.params.postId);
     const userId = req.utente.id;
-
-    if (!postId) {
-        return res.status(400).json({ message: "Post non valido." });
-    }
+    if (!postId) return res.status(400).json({ message: "Post non valido." });
 
     try {
-        const existingLike = await db('forum_post_likes')
-            .where({ post_id: postId, user_id: userId })
-            .first();
-
+        const existingLike = await db('forum_post_likes').where({ post_id: postId, user_id: userId }).first();
         if (existingLike) {
-            // 🔻 UNLIKE
-            await db('forum_post_likes')
-                .where({ post_id: postId, user_id: userId })
-                .del();
-
+            await db('forum_post_likes').where({ post_id: postId, user_id: userId }).del();
             return res.json({ liked: false });
         } else {
-            // 🔺 LIKE
-            await db('forum_post_likes')
-                .insert({ post_id: postId, user_id: userId });
-
+            await db('forum_post_likes').insert({ post_id: postId, user_id: userId });
             return res.json({ liked: true });
         }
-
     } catch (error) {
         console.error("Errore toggle like:", error);
         res.status(500).json({ message: "Errore gestione like." });
@@ -1515,7 +1202,6 @@ app.post('/api/forum/posts/:postId/like', verificaToken, async (req, res) => {
 // --- HOUSING SYSTEM ---
 // =================================================================
 
-// 1. VISUALIZZA LISTA CASE (Per Agenzia Immobiliare)
 app.get('/api/housing/market', verificaToken, async (req, res) => {
     try {
         const houses = await db('housing_types').select('*').orderBy('cost_rem', 'asc');
@@ -1523,7 +1209,6 @@ app.get('/api/housing/market', verificaToken, async (req, res) => {
     } catch (e) { res.status(500).json({ message: "Errore market." }); }
 });
 
-// 2. AFFITTA / COMPRA CASA
 app.post('/api/housing/rent', verificaToken, async (req, res) => {
     const { houseId } = req.body;
     const userId = req.utente.id;
@@ -1534,53 +1219,33 @@ app.post('/api/housing/rent', verificaToken, async (req, res) => {
             const user = await trx('utenti').where('id_utente', userId).first();
 
             if (!house) throw new Error("Abitazione non valida.");
-            
-            // Se ha già una casa, deve prima lasciarla (logica semplificata per ora)
             if (user.housing_id) throw new Error("Hai già un'abitazione! Disdici prima quella attuale.");
 
-            // Pagamento primo mese (se non è 'DAILY_SALARY')
             if (house.cost_type === 'MONTHLY') {
                 if (user.rem < house.cost_rem) throw new Error("Fondi insufficienti per il primo mese/caparra.");
-                
-                // Sottrai soldi
                 await trx('utenti').where('id_utente', userId).decrement('rem', house.cost_rem);
-                
-                // Registra transazione
                 await trx('transactions').insert({
-                    sender_id: userId, receiver_id: null, // Null = System/Banca
-                    amount: house.cost_rem, reason: `Affitto iniziale: ${house.name}`
+                    sender_id: userId, receiver_id: null, amount: house.cost_rem, reason: `Affitto iniziale: ${house.name}`
                 });
             }
 
-            // Calcola scadenza (30 giorni da oggi)
             const nextDueDate = new Date();
             nextDueDate.setDate(nextDueDate.getDate() + 30);
-
-            // Genera ID Chat Privata univoco (es: "house_15_uuid")
             const houseChatId = `house_${userId}_${Date.now()}`;
 
-            // Aggiorna Utente
             await trx('utenti').where('id_utente', userId).update({
                 housing_id: house.id,
                 rent_due_date: nextDueDate,
                 house_chat_id: houseChatId,
-                // Aggiorniamo anche gli slot totali?
-                // Per ora li teniamo separati, li sommeremo nel frontend o quando servono
             });
-            
-            // Creiamo la "Chat Location" (Opzionale, se usi la tabella locations per le chat)
-            // Se gestisci le chat dinamiche solo via socket, basta l'ID salvato nell'utente.
         });
-
         res.json({ message: "Abitazione acquisita con successo! Benvenuto a casa." });
-
     } catch (error) {
         console.error("Errore acquisto casa:", error);
         res.status(400).json({ message: error.message || "Errore interno." });
     }
 });
 
-// 3. ENTRA IN CASA (Recupera dati chat)
 app.get('/api/housing/my-house', verificaToken, async (req, res) => {
     try {
         const user = await db('utenti')
@@ -1588,14 +1253,11 @@ app.get('/api/housing/my-house', verificaToken, async (req, res) => {
             .select('housing_types.name', 'utenti.house_chat_id', 'utenti.rent_due_date', 'housing_types.cost_rem')
             .where('utenti.id_utente', req.utente.id)
             .first();
-
         if (!user || !user.house_chat_id) return res.status(404).json({ message: "Non hai una casa." });
-
         res.json(user);
     } catch (e) { res.status(500).json({ message: "Errore." }); }
 });
 
-// 4. PAGA AFFITTO (Trigger manuale dal messaggio Locatario)
 app.post('/api/housing/pay-rent', verificaToken, async (req, res) => {
     const userId = req.utente.id;
     try {
@@ -1609,48 +1271,35 @@ app.post('/api/housing/pay-rent', verificaToken, async (req, res) => {
             if (!user) throw new Error("Nessuna casa da pagare.");
             if (user.rem < user.cost_rem) throw new Error("Fondi insufficienti.");
 
-            // Paga
             await trx('utenti').where('id_utente', userId).decrement('rem', user.cost_rem);
-            
-            // Aggiorna data (+30 giorni)
             const newDate = new Date(user.rent_due_date);
             newDate.setDate(newDate.getDate() + 30);
-            
             await trx('utenti').where('id_utente', userId).update({ rent_due_date: newDate });
-            
-            // Log transazione
             await trx('transactions').insert({ sender_id: userId, amount: user.cost_rem, reason: `Affitto mensile: ${user.name}` });
         });
         res.json({ message: "Affitto pagato. Grazie!" });
     } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
-// 5. INVITA OSPITE (Dai le chiavi)
 app.post('/api/housing/invite', verificaToken, async (req, res) => {
     const { guestName } = req.body;
     const userId = req.utente.id;
-
     try {
-        // 1. Recupera la casa dell'utente
         const myHouse = await db('utenti').select('housing_id').where('id_utente', userId).first();
         if (!myHouse || !myHouse.housing_id) return res.status(400).json({ message: "Non hai una casa." });
 
-        // 2. Trova l'ospite
         const guest = await db('utenti').select('id_utente').where(db.raw('LOWER(nome_pg) = LOWER(?)', [guestName])).first();
         if (!guest) return res.status(404).json({ message: "Giocatore non trovato." });
         if (guest.id_utente === userId) return res.status(400).json({ message: "Hai già le chiavi di casa tua." });
 
-        // 3. Dai le chiavi (Inserisci in tabella)
         await db('housing_guests').insert({
             housing_id: myHouse.housing_id,
             owner_id: userId,
             guest_id: guest.id_utente
         });
-
         res.json({ message: `Hai dato le chiavi di casa a ${guestName}.` });
-
     } catch (e) {
-        if (e.code === '23505' || e.code === 'SQLITE_CONSTRAINT') { // Codice errore duplicato
+        if (e.code === '23505' || e.code === 'SQLITE_CONSTRAINT') {
             return res.status(400).json({ message: "Questo giocatore ha già le chiavi." });
         }
         console.error(e);
@@ -1658,19 +1307,15 @@ app.post('/api/housing/invite', verificaToken, async (req, res) => {
     }
 });
 
-// 6. REVOCA CHIAVI (Caccia ospite)
 app.post('/api/housing/revoke', verificaToken, async (req, res) => {
     const { guestId } = req.body;
     const userId = req.utente.id;
     try {
-        await db('housing_guests')
-            .where({ owner_id: userId, guest_id: guestId })
-            .del();
+        await db('housing_guests').where({ owner_id: userId, guest_id: guestId }).del();
         res.json({ message: "Chiavi ritirate." });
     } catch (e) { res.status(500).json({ message: "Errore revoca." }); }
 });
 
-// 7. LISTA OSPITI (Per il proprietario)
 app.get('/api/housing/guests', verificaToken, async (req, res) => {
     try {
         const guests = await db('housing_guests')
@@ -1681,50 +1326,31 @@ app.get('/api/housing/guests', verificaToken, async (req, res) => {
     } catch (e) { res.status(500).json({ message: "Errore lista ospiti." }); }
 });
 
-// 8. LE MIE CHIAVI (Case altrui dove sono ospite)
 app.get('/api/housing/guest-access', verificaToken, async (req, res) => {
     try {
         const houses = await db('housing_guests')
             .join('utenti', 'housing_guests.owner_id', 'utenti.id_utente')
             .join('housing_types', 'housing_guests.housing_id', 'housing_types.id')
-            .select(
-                'utenti.nome_pg as owner_name', 
-                'housing_types.name as house_name',
-                'utenti.house_chat_id' // Serve per entrare nella chat!
-            )
+            .select('utenti.nome_pg as owner_name', 'housing_types.name as house_name', 'utenti.house_chat_id')
             .where('housing_guests.guest_id', req.utente.id);
         res.json(houses);
     } catch (e) { res.status(500).json({ message: "Errore recupero chiavi." }); }
 });
 
-// [NUOVO] 9. LASCIA ABITAZIONE (Rescindi contratto)
 app.post('/api/housing/leave', verificaToken, async (req, res) => {
     const userId = req.utente.id;
-
     try {
         const user = await db('utenti').where('id_utente', userId).first();
-
-        // Verifica se l'utente ha effettivamente una casa
-        if (!user.housing_id) {
-            return res.status(400).json({ message: "Non possiedi alcuna abitazione da lasciare." });
-        }
+        if (!user.housing_id) return res.status(400).json({ message: "Non possiedi alcuna abitazione da lasciare." });
 
         await db.transaction(async (trx) => {
-            // 1. Rimuovi i dati abitazione dall'utente
             await trx('utenti').where('id_utente', userId).update({
-                housing_id: null,       // Rimuove il riferimento al tipo di casa
-                house_chat_id: null,    // Rimuove l'id della chat
-                rent_due_date: null,    // Rimuove la scadenza affitto
-                house_custom_image: null, // (Opzionale) Reset immagine personalizzata
-                house_custom_desc: null   // (Opzionale) Reset descrizione personalizzata
+                housing_id: null, house_chat_id: null, rent_due_date: null,
+                house_custom_image: null, house_custom_desc: null
             });
-
-            // 2. Rimuovi eventuali ospiti che avevano le chiavi di questa casa
             await trx('housing_guests').where('owner_id', userId).del();
         });
-
         res.json({ message: "Hai rescisso il contratto e lasciato l'abitazione." });
-
     } catch (error) {
         console.error("Errore lascia immobile:", error);
         res.status(500).json({ message: "Errore interno del server." });
@@ -1734,15 +1360,10 @@ app.post('/api/housing/leave', verificaToken, async (req, res) => {
 app.put('/api/housing/customize', verificaToken, async (req, res) => {
     const { customImage, customDesc } = req.body;
     try {
-        await db('utenti')
-            .where('id_utente', req.utente.id)
-            .update({ 
-                house_custom_image: customImage, 
-                house_custom_desc: customDesc 
-            });
+        await db('utenti').where('id_utente', req.utente.id).update({ house_custom_image: customImage, house_custom_desc: customDesc });
         res.json({ message: "Dati abitazione aggiornati." });
     } catch (e) {
-        console.error("Errore salvataggio casa:", e); // Aggiunto log per debug
+        console.error("Errore salvataggio casa:", e);
         res.status(500).json({ message: "Errore aggiornamento." });
     }
 });
@@ -1750,216 +1371,100 @@ app.put('/api/housing/customize', verificaToken, async (req, res) => {
 app.get('/api/housing/chat/:chatId', verificaToken, async (req, res) => {
     try {
         const { chatId } = req.params;
-
-        // Cerchiamo l'utente proprietario di questa chat casa
         const houseData = await db('utenti')
             .join('housing_types', 'utenti.housing_id', 'housing_types.id')
             .select(
-                'housing_types.name as type_name',
-                'housing_types.description as default_desc',
-                'utenti.nome_pg as owner_name',
-                'utenti.house_custom_image',
-                'utenti.house_custom_desc'
+                'housing_types.name as type_name', 'housing_types.description as default_desc',
+                'utenti.nome_pg as owner_name', 'utenti.house_custom_image', 'utenti.house_custom_desc'
             )
             .where('utenti.house_chat_id', chatId)
             .first();
 
-        if (!houseData) {
-            return res.status(404).json({ message: "Casa non trovata." });
-        }
+        if (!houseData) return res.status(404).json({ message: "Casa non trovata." });
 
-        // Formattiamo i dati esattamente come se fosse una "Location" normale
-        const responseData = {
-            name: houseData.type_name, // O "Casa di X"
-            // Se c'è una descrizione personalizzata usa quella, altrimenti quella standard
+        res.json({
+            name: houseData.type_name,
             description: houseData.house_custom_desc || houseData.default_desc,
-            // Se c'è l'immagine custom usa quella
             image_url: houseData.house_custom_image || null,
-            // Info extra utile per il master notes
             owner: houseData.owner_name
-        };
-
-        res.json(responseData);
-
+        });
     } catch (e) {
         console.error("Errore recupero dettagli chat casa:", e);
         res.status(500).json({ message: "Errore interno." });
     }
 });
 
-// 10. [HOUSING] GUARDA NEGLI ARMADI (Vedi inventario casa)
+// HOUSING INVENTORY
 app.get('/api/housing/house-inventory/:chatId', verificaToken, async (req, res) => {
     const { chatId } = req.params;
     const userId = req.utente.id;
 
     try {
-        // 1. Identifica la casa dalla chat
         const houseOwner = await db('utenti').where('house_chat_id', chatId).first();
         if (!houseOwner) return res.status(404).json({ message: "Questa non è una casa." });
 
-        // 2. Controllo Permessi (Proprietario, Ospite o Admin)
         const isOwner = houseOwner.id_utente === userId;
         const isAdmin = ['ADMIN', 'MOD'].includes(req.utente.permesso);
         let isGuest = false;
 
         if (!isOwner && !isAdmin) {
-            const guestRecord = await db('housing_guests')
-                .where({ housing_id: houseOwner.housing_id, guest_id: userId })
-                .first();
+            const guestRecord = await db('housing_guests').where({ housing_id: houseOwner.housing_id, guest_id: userId }).first();
             if (guestRecord) isGuest = true;
         }
 
-        if (!isOwner && !isGuest && !isAdmin) {
-            return res.status(403).json({ message: "Non hai le chiavi per frugare qui." });
-        }
+        if (!isOwner && !isGuest && !isAdmin) return res.status(403).json({ message: "Non hai le chiavi per frugare qui." });
 
-        // 3. Recupera inventario del proprietario
-        // NOTA: Assumiamo che la tua tabella oggetti si chiami 'oggetti' e l'inventario 'inventario'
-        // Se i nomi sono diversi nel tuo DB, correggi qui sotto!
         const items = await db('inventario')
             .join('oggetti', 'inventario.item_id', 'oggetti.id') 
             .select('inventario.id as inv_id', 'oggetti.nome', 'oggetti.icona', 'inventario.quantita')
             .where('inventario.user_id', houseOwner.id_utente);
 
         res.json({ ownerName: houseOwner.nome_pg, items, isOwner });
-
     } catch (e) {
         console.error("Errore inventario casa:", e);
-        // Restituiamo lista vuota in caso di errore (es. tabella inventario mancante) per non bloccare
         res.json({ ownerName: "Sconosciuto", items: [] }); 
     }
 });
 
-// 11. [HOUSING] RUBA OGGETTO
+// HOUSING STEAL
 app.post('/api/housing/steal', verificaToken, async (req, res) => {
     const { invItemId, targetChatId } = req.body; 
     const thiefId = req.utente.id;
 
     try {
         await db.transaction(async (trx) => {
-            // Verifica casa e proprietario
             const houseOwner = await trx('utenti').where('house_chat_id', targetChatId).first();
             if (!houseOwner) throw new Error("Casa non trovata.");
-
             if (houseOwner.id_utente === thiefId) throw new Error("Non puoi rubare a te stesso!");
 
-            // Verifica oggetto
             const itemToSteal = await trx('inventario').where('id', invItemId).first();
-            if (!itemToSteal || itemToSteal.user_id !== houseOwner.id_utente) {
-                throw new Error("L'oggetto non è più qui.");
-            }
+            if (!itemToSteal || itemToSteal.user_id !== houseOwner.id_utente) throw new Error("L'oggetto non è più qui.");
 
-            // --- ESECUZIONE FURTO (Sposta 1 unità) ---
-            
-            // 1. Rimuovi da Vittima
             if (itemToSteal.quantita > 1) {
                 await trx('inventario').where('id', invItemId).decrement('quantita', 1);
             } else {
                 await trx('inventario').where('id', invItemId).del();
             }
 
-            // 2. Aggiungi a Ladro
-            const existingItem = await trx('inventario')
-                .where({ user_id: thiefId, item_id: itemToSteal.item_id })
-                .first();
-
+            const existingItem = await trx('inventario').where({ user_id: thiefId, item_id: itemToSteal.item_id }).first();
             if (existingItem) {
                 await trx('inventario').where('id', existingItem.id).increment('quantita', 1);
             } else {
-                await trx('inventario').insert({
-                    user_id: thiefId,
-                    item_id: itemToSteal.item_id,
-                    quantita: 1
-                });
+                await trx('inventario').insert({ user_id: thiefId, item_id: itemToSteal.item_id, quantita: 1 });
             }
 
-            // 3. Notifica in Chat (Il brivido del rischio!)
-            // Usiamo il socket se possibile, altrimenti salviamo nel log
             const thiefName = req.utente.nome_pg;
             await trx('chat_log').insert({
-                chat_id: targetChatId,
-                autore: 'SISTEMA',
+                chat_id: targetChatId, autore: 'SISTEMA',
                 testo: `⚠️ RUMORI SOSPETTI: Qualcuno sta frugando tra gli oggetti di ${houseOwner.nome_pg}!`,
                 tipo: 'azione' 
             });
         });
-
         res.json({ message: "Hai rubato l'oggetto! Scappa!" });
-
     } catch (e) {
         console.error("Errore furto:", e);
         res.status(500).json({ message: e.message || "Errore durante il furto." });
     }
-});
-
-// =================================================================
-// --- GESTIONE AVANZATA FORUM (ADMIN/MOD) ---
-// =================================================================
-
-// PIN / UNPIN (Fissare in alto)
-app.put('/api/admin/forum/topics/:id/pin', verificaToken, verificaMod, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { is_pinned } = req.body; // true o false
-        await db('forum_topics').where({ id }).update({ is_pinned: is_pinned ? 1 : 0 });
-        res.json({ message: `Discussione ${is_pinned ? 'fissata' : 'sbloccata'}.` });
-    } catch (e) {
-        console.error("Errore operazione pin:", e);
-        res.status(500).json({ message: "Errore interno." });
-    }
-});
-
-// LOCK / UNLOCK (Chiudere la discussione)
-app.put('/api/admin/forum/topics/:id/lock', verificaToken, verificaMod, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { is_locked } = req.body; // true o false
-        await db('forum_topics').where({ id }).update({ is_locked: is_locked ? 1 : 0 });
-        res.json({ message: `Discussione ${is_locked ? 'chiusa' : 'riaperta'}.` });
-    } catch (e) {
-        console.error("Errore operazione lock:", e);
-        res.status(500).json({ message: "Errore interno." });
-    }
-});
-
-// CANCELLARE DISCUSSIONE
-app.delete('/api/admin/forum/topics/:id', verificaToken, verificaMod, async (req, res) => {
-    try {
-        // La cancellazione a cascata (post collegati) dovrebbe essere gestita dal DB (ON DELETE CASCADE)
-        // Se non lo è, cancelliamo prima i post per sicurezza
-        await db('forum_posts').where({ topic_id: req.params.id }).del();
-        await db('forum_topics').where({ id: req.params.id }).del();
-        res.json({ message: "Discussione eliminata con successo." });
-    } catch (e) {
-        console.error("Errore eliminazione topic:", e);
-        res.status(500).json({ message: "Errore interno." });
-    }
-});
-
-// CANCELLARE SINGOLO POST
-app.delete('/api/admin/forum/posts/:id', verificaToken, verificaMod, async (req, res) => {
-    try {
-        await db('forum_posts').where({ id: req.params.id }).del();
-        res.json({ message: "Post eliminato." });
-    } catch (e) {
-        console.error("Errore eliminazione post:", e);
-        res.status(500).json({ message: "Errore interno." });
-    }
-});
-
-
-// NEWS VISOR API
-app.get('/api/forum/bacheca/:bachecaId/latest-topics', verificaToken, async (req, res) => {
-    try {
-        const anteprimaRaw = (environment === 'development') ? "SUBSTR(p.testo, 1, 120) || ' ...' as anteprima" : "SUBSTRING(p.testo, 1, 120) || ' ...' as anteprima";
-        const topics = await db('forum_topics as t')
-            .join('forum_posts as p', 'p.topic_id', 't.id')
-            .select('t.titolo', db.raw(anteprimaRaw), 't.timestamp_creazione')
-            .where('t.bacheca_id', req.params.bachecaId)
-            .andWhere('p.id', function() { this.from('forum_posts').min('id').whereRaw('topic_id = t.id'); })
-            .orderBy('t.ultimo_post_timestamp', 'desc').limit(5);
-        res.json(topics);
-    } catch (e) { res.status(500).json({ message: 'Errore.' }); }
 });
 
 // =================================================================
@@ -1983,25 +1488,20 @@ app.post('/api/bank/transfer', verificaToken, async (req, res) => {
         res.json({ message: "Trasferimento completato." });
     } catch (e) { res.status(400).json({ message: e.message }); }
 });
-// 2. STORICO TRANSAZIONI
+
 app.get('/api/bank/history', verificaToken, async (req, res) => {
     try {
         const history = await db('transactions')
             .join('utenti as sender', 'transactions.sender_id', 'sender.id_utente')
             .leftJoin('utenti as receiver', 'transactions.receiver_id', 'receiver.id_utente')
             .select(
-                'transactions.id', // <--- AGGIUNGI QUESTO!
-                'transactions.amount',
-                'transactions.reason',
-                'transactions.timestamp',
-                'sender.nome_pg as sender_name',
-                'receiver.nome_pg as receiver_name'
+                'transactions.id', 'transactions.amount', 'transactions.reason', 'transactions.timestamp',
+                'sender.nome_pg as sender_name', 'receiver.nome_pg as receiver_name'
             )
             .where('transactions.sender_id', req.utente.id)
             .orWhere('transactions.receiver_id', req.utente.id)
             .orderBy('transactions.timestamp', 'desc')
             .limit(5);
-
         res.json(history);
     } catch (error) {
         console.error("Errore storico banca:", error);
@@ -2009,84 +1509,50 @@ app.get('/api/bank/history', verificaToken, async (req, res) => {
     }
 });
 
-// 3. INFO LAVORO E STIPENDIO
 app.get('/api/bank/job', verificaToken, async (req, res) => {
     try {
-        const user = await db('utenti')
-            .select('job', 'last_salary_collection', 'rem')
-            .where('id_utente', req.utente.id)
-            .first();
+        const user = await db('utenti').select('job', 'last_salary_collection', 'rem').where('id_utente', req.utente.id).first();
         res.json(user);
     } catch (error) {
         res.status(500).json({ message: "Errore info lavoro." });
     }
 });
 
-// 4. RITIRA STIPENDIO
 app.post('/api/bank/collect-salary', verificaToken, async (req, res) => {
     const userId = req.utente.id;
-    const BASE_SALARY = 90; // O calcolato in base al lavoro
+    const BASE_SALARY = 90; 
     const COOLDOWN_HOURS = 24;
 
     try {
-        // Recuperiamo utente E info sulla casa (costo e tipo pagamento)
         const user = await db('utenti')
             .leftJoin('housing_types', 'utenti.housing_id', 'housing_types.id')
-            .select(
-                'utenti.*', 
-                'housing_types.cost_rem as house_cost', 
-                'housing_types.cost_type as house_payment_type',
-                'housing_types.name as house_name'
-            )
-            .where('utenti.id_utente', userId)
-            .first();
+            .select('utenti.*', 'housing_types.cost_rem as house_cost', 'housing_types.cost_type as house_payment_type', 'housing_types.name as house_name')
+            .where('utenti.id_utente', userId).first();
         
-        // 1. Controllo Cooldown (come prima)
         if (user.last_salary_collection) {
             const lastCollection = new Date(user.last_salary_collection);
-            const now = new Date();
-            const diffHours = (now - lastCollection) / (1000 * 60 * 60);
-            
-            if (diffHours < COOLDOWN_HOURS) {
-                return res.status(400).json({ message: `Devi attendere ancora ${(COOLDOWN_HOURS - diffHours).toFixed(1)} ore.` });
-            }
+            const diffHours = (new Date() - lastCollection) / (1000 * 60 * 60);
+            if (diffHours < COOLDOWN_HOURS) return res.status(400).json({ message: `Devi attendere ancora ${(COOLDOWN_HOURS - diffHours).toFixed(1)} ore.` });
         }
 
-        // 2. Calcolo Stipendio Netto
         let finalAmount = BASE_SALARY;
         let rentDeduction = 0;
         let logReason = "Stipendio Giornaliero";
 
-        // Se ha una casa E il tipo di pagamento è DAILY_SALARY (Detrazione Stipendio)
         if (user.housing_id && user.house_payment_type === 'DAILY_SALARY') {
             rentDeduction = user.house_cost || 0;
             finalAmount = BASE_SALARY - rentDeduction;
             logReason = `Stipendio (Netto: ${BASE_SALARY} - ${rentDeduction} Affitto)`;
         }
-
-        // Se l'affitto è più alto dello stipendio (non dovrebbe succedere, ma per sicurezza)
         if (finalAmount < 0) finalAmount = 0;
 
-        // 3. Eseguiamo la Transazione
         await db.transaction(async (trx) => {
-            await trx('utenti').where('id_utente', userId).update({
-                rem: user.rem + finalAmount,
-                last_salary_collection: new Date()
-            });
-            
-            await trx('transactions').insert({
-                sender_id: null, // Sistema
-                receiver_id: userId,
-                amount: finalAmount,
-                reason: logReason
-            });
+            await trx('utenti').where('id_utente', userId).update({ rem: user.rem + finalAmount, last_salary_collection: new Date() });
+            await trx('transactions').insert({ sender_id: null, receiver_id: userId, amount: finalAmount, reason: logReason });
         });
 
-        if (rentDeduction > 0) {
-            res.json({ message: `Hai ritirato ${finalAmount} REM (Dedotti ${rentDeduction} per l'affitto di ${user.house_name})!` });
-        } else {
-            res.json({ message: `Hai ritirato ${finalAmount} REM!` });
-        }
+        if (rentDeduction > 0) res.json({ message: `Hai ritirato ${finalAmount} REM (Dedotti ${rentDeduction} per l'affitto di ${user.house_name})!` });
+        else res.json({ message: `Hai ritirato ${finalAmount} REM!` });
 
     } catch (error) {
         console.error("Errore stipendio:", error);
@@ -2094,63 +1560,37 @@ app.post('/api/bank/collect-salary', verificaToken, async (req, res) => {
     }
 });
 
-// MODIFICA: 5. IMPOSTA LAVORO 
 app.post('/api/bank/set-job', verificaToken, async (req, res) => {
     const { jobName } = req.body;
     const userId = req.utente.id;
-
     if (!jobName) return res.status(400).json({ message: "Devi selezionare un lavoro." });
 
     try {
         const user = await db('utenti').where('id_utente', userId).first();
         if (user.job) return res.status(400).json({ message: "Hai già un impiego!" });
 
-        await db('utenti').where('id_utente', userId).update({
-            job: jobName,
-            last_salary_collection: null,
-            // job_started_at: new Date()  <--- COMMENTA O RIMUOVI QUESTA RIGA SE NON HAI AGGIORNATO IL DB
-        });
-
+        await db('utenti').where('id_utente', userId).update({ job: jobName, last_salary_collection: null });
         res.json({ message: `Congratulazioni! Ora lavori come ${jobName}.` });
     } catch (error) {
-        console.error("ERRORE SET-JOB:", error); // <--- Questo ti dirà l'errore esatto nel terminale
+        console.error("ERRORE SET-JOB:", error); 
         res.status(500).json({ message: "Errore server." });
     }
 });
 
-// [NUOVO] 6. LASCIA LAVORO (Con controllo 10 giorni)
 app.post('/api/bank/leave-job', verificaToken, async (req, res) => {
     const userId = req.utente.id;
     const MIN_DAYS = 10;
-
     try {
         const user = await db('utenti').where('id_utente', userId).first();
-
         if (!user.job) return res.status(400).json({ message: "Non hai un lavoro da lasciare." });
 
-        // Controllo Cooldown
         if (user.job_started_at) {
-            const startDate = new Date(user.job_started_at);
-            const now = new Date();
-            const diffTime = Math.abs(now - startDate);
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-
-            if (diffDays < MIN_DAYS) {
-                return res.status(400).json({ 
-                    message: `Devi mantenere il lavoro per almeno ${MIN_DAYS} giorni. (Mancano ${MIN_DAYS - diffDays} gg)` 
-                });
-            }
+            const diffDays = Math.ceil(Math.abs(new Date() - new Date(user.job_started_at)) / (1000 * 60 * 60 * 24)); 
+            if (diffDays < MIN_DAYS) return res.status(400).json({ message: `Devi mantenere il lavoro per almeno ${MIN_DAYS} giorni. (Mancano ${MIN_DAYS - diffDays} gg)` });
         }
 
-        // Procedi alle dimissioni
-        await db('utenti').where('id_utente', userId).update({
-            job: null,
-            last_salary_collection: null,
-            job_started_at: null
-        });
-
+        await db('utenti').where('id_utente', userId).update({ job: null, last_salary_collection: null, job_started_at: null });
         res.json({ message: "Hai rassegnato le dimissioni." });
-
     } catch (error) {
         console.error("Errore leave job:", error);
         res.status(500).json({ message: "Errore interno." });
@@ -2163,63 +1603,39 @@ app.post('/api/bank/leave-job', verificaToken, async (req, res) => {
 
 app.get('/api/pm/conversations', verificaToken, async (req, res) => {
     const myId = req.utente.id;
-
     try {
-        // 1. Scarichiamo TUTTI i messaggi che ti riguardano
         const messages = await db('private_messages')
-            .where({ sender_id: myId })
-            .orWhere({ receiver_id: myId })
+            .where({ sender_id: myId }).orWhere({ receiver_id: myId })
             .orderBy('timestamp', 'desc');
 
-        // 2. Elaboriamo la lista manualmente (più sicuro che fare query SQL complesse)
         const conversationMap = new Map();
-
         for (const msg of messages) {
             const otherId = (msg.sender_id === myId) ? msg.receiver_id : msg.sender_id;
-
             if (!conversationMap.has(otherId)) {
                 conversationMap.set(otherId, {
-                    last_message: msg.text,
-                    last_message_timestamp: msg.timestamp,
-                    unread_count: 0, 
-                    otherId: otherId
+                    last_message: msg.text, last_message_timestamp: msg.timestamp, unread_count: 0, otherId: otherId
                 });
             }
-            
-            // Conta i non letti
             if (msg.receiver_id === myId && !msg.is_read) {
-                const conv = conversationMap.get(otherId);
-                conv.unread_count += 1;
+                conversationMap.get(otherId).unread_count += 1;
             }
         }
 
-        // 3. Recuperiamo i nomi e avatar degli interlocutori
         const conversations = [];
         const partnerIds = Array.from(conversationMap.keys());
-
         if (partnerIds.length > 0) {
-            const partners = await db('utenti')
-                .select('id', 'nome_pg', 'avatar_chat')
-                .whereIn('id', partnerIds);
-
+            const partners = await db('utenti').select('id_utente as id', 'nome_pg', 'avatar_chat').whereIn('id_utente', partnerIds);
             partners.forEach(partner => {
                 const convData = conversationMap.get(partner.id);
                 conversations.push({
-                    id_utente: partner.id,
-                    nome_pg: partner.nome_pg,
-                    avatar_chat: partner.avatar_chat,
-                    last_message: convData.last_message,
-                    last_message_timestamp: convData.last_message_timestamp,
+                    id_utente: partner.id, nome_pg: partner.nome_pg, avatar_chat: partner.avatar_chat,
+                    last_message: convData.last_message, last_message_timestamp: convData.last_message_timestamp,
                     unread_count: convData.unread_count
                 });
             });
         }
-
-        // 4. Ordiniamo per data
         conversations.sort((a, b) => new Date(b.last_message_timestamp) - new Date(a.last_message_timestamp));
-
         res.json(conversations);
-
     } catch (error) {
         console.error("Errore recupero conversazioni:", error);
         res.status(500).json({ message: 'Errore interno del server.' });
@@ -2254,79 +1670,36 @@ app.get('/api/playlists/:id/songs', verificaToken, async (req, res) => {
     const songs = await db('songs').select('*').where('playlist_id', req.params.id).orderBy('id', 'asc');
     res.json(songs);
 });
-// Endpoint speciale per lo streaming da YouTube
 app.get('/api/youtube-stream/:videoId', async (req, res) => {
     const videoId = req.params.videoId;
-    console.log(`[Server] Ricevuta richiesta per lo streaming di: ${videoId}`); 
-
+    console.log(`[Server] Streaming: ${videoId}`); 
     try {
-        if (!ytdl.validateID(videoId)) {
-            console.error(`[Server] ID video non valido: ${videoId}`);
-            return res.status(400).send("ID video non valido");
-        }
-
+        if (!ytdl.validateID(videoId)) return res.status(400).send("ID video non valido");
         const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
         const info = await ytdl.getInfo(videoUrl);
-        
-        const format = ytdl.chooseFormat(info.formats, { 
-            quality: 'highestaudio', 
-            filter: 'audioonly' 
-        });
-
-        if (!format) {
-            console.error(`[Server] Nessun formato solo audio trovato per ${videoId}.`);
-            return res.status(404).send("Formato audio non trovato per questo video.");
-        }
-        
-        console.log(`[Server] Formato audio trovato. Avvio dello streaming...`);
+        const format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio', filter: 'audioonly' });
+        if (!format) return res.status(404).send("Formato audio non trovato.");
         ytdl(videoUrl, { format: format }).pipe(res);
-
     } catch (error) {
-        console.error(`[Server] ERRORE CRITICO nello streaming di ${videoId}:`, error.message);
-        res.status(500).send("Errore durante il recupero dello stream audio.");
+        console.error(`[Server] Errore streaming ${videoId}:`, error.message);
+        res.status(500).send("Errore streaming.");
     }
 });
 
-// --- API EVENTI GIORNALIERI (Daily Event) ---
 app.get('/api/daily-event', verificaToken, async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const event = await db('daily_events').select('title', 'description').where('event_date', today).first();
     res.json(event || null);
 });
 
-
-// [PUT] RESET STATS (ADMIN)
 app.put('/api/admin/reset-stats/:id', verificaToken, verificaMod, async (req, res) => {
     const { id } = req.params;
-    
     const resetStats = {
-        // Statistiche Base
-        forza: 1, 
-        destrezza: 1, 
-        costituzione: 1, 
-        mente: 1, 
-        empatia: 1,
-        
-        // Statistiche Derivate
-        stat_body: 10,
-        stat_kotodama: 10,
-        reflexes: 1,
-        velocita: 1,
-        
-        // --- QUI C'ERA L'ERRORE ---
-        percezione_sensi: 1,        // <--- PRIMA ERA percezione_fisica
-        // --------------------------
-        
-        percezione_spirituale: 1,
-        movimento: 1,
-        salto: 1,
-        lancio: 1,
-        peso_trasportabile: 1,
-        ingaggio: 1,
-        danno_cac: 1,
-        danno_cad: 1
+        forza: 1, destrezza: 1, costituzione: 1, mente: 1, empatia: 1,
+        stat_body: 10, stat_kotodama: 10, reflexes: 1, velocita: 1,
+        percezione_sensi: 1, percezione_spirituale: 1, movimento: 1, salto: 1,
+        lancio: 1, peso_trasportabile: 1, ingaggio: 1, danno_cac: 1, danno_cad: 1
     };
-
     try {
         await db('utenti').where({ id_utente: id }).update(resetStats);
         res.json({ message: `Statistiche resettate per l'utente ${id}.`});
@@ -2354,198 +1727,98 @@ io.on('connection', async (socket) => {
         if (!userData) { return socket.disconnect(); }
         
         const userProfile = { id: socket.utente.id, nome_pg: userData.nome_pg, permesso: userData.permesso, avatar_chat: userData.avatar_chat || '/icone/mini_avatar.png' };
-        
         console.log(`✅ Utente AUTENTICATO connesso: ${userProfile.nome_pg}`);
         onlineUsers[socket.id] = userProfile;
         userSockets.set(userProfile.id, socket.id); 
         
-        // --- 1. FIX LISTA GLOBALE (Rimuovi duplicati) ---
         const getUniqueGlobalUsers = () => {
             const uniqueMap = new Map();
-            Object.values(onlineUsers).forEach(u => {
-                if (u && u.id) uniqueMap.set(u.id, u);
-            });
+            Object.values(onlineUsers).forEach(u => { if (u && u.id) uniqueMap.set(u.id, u); });
             return Array.from(uniqueMap.values());
         };
         io.emit('update_online_list', getUniqueGlobalUsers());
         
-        // --- 2. FIX LISTA STANZA (Rimuovi duplicati) ---
         const updateRoomUsers = async (chatId) => {
             const socketsInRoom = await io.in(chatId).fetchSockets();
-            
-            // Mappiamo i socket agli utenti
             const rawUsers = socketsInRoom.map(s => onlineUsers[s.id]).filter(u => u);
-            
-            // Usiamo una Map per tenere solo un utente per ogni ID
             const uniqueUsersMap = new Map();
-            rawUsers.forEach(user => {
-                if (!uniqueUsersMap.has(user.id)) {
-                    uniqueUsersMap.set(user.id, user);
-                }
-            });
-            
-            // Convertiamo la Map in Array
-            const uniqueUsers = Array.from(uniqueUsersMap.values());
-            
-            io.to(chatId).emit('room_users_update', uniqueUsers);
+            rawUsers.forEach(user => { if (!uniqueUsersMap.has(user.id)) uniqueUsersMap.set(user.id, user); });
+            io.to(chatId).emit('room_users_update', Array.from(uniqueUsersMap.values()));
         };
 
         socket.on('join_chat', (chatId) => { socket.join(chatId); updateRoomUsers(chatId); });
         socket.on('leave_chat', (chatId) => { socket.leave(chatId); updateRoomUsers(chatId); });
 
-        // --- GESTIONE MESSAGGI CHAT ---
         socket.on('send_message', async (data) => {
-            
-            // 1. CONTROLLO BAN (Il Posto di Blocco)
             try {
-                // Interroghiamo il DB per vedere lo stato attuale dell'utente
-                const checkBan = await db('utenti')
-                    .select('ban_expires_at', 'ban_type')
-                    .where('id_utente', socket.utente.id)
-                    .first();
-
-                // Se c'è una data di scadenza futura...
+                const checkBan = await db('utenti').select('ban_expires_at', 'ban_type').where('id_utente', socket.utente.id).first();
                 if (checkBan && checkBan.ban_expires_at && new Date(checkBan.ban_expires_at) > new Date()) {
-                    
-                    // Se è SHADOW BAN o FULL BAN, blocchiamo tutto.
-                    // (Nel caso FULL non dovrebbe nemmeno essere qui, ma per sicurezza controlliamo)
                     if (checkBan.ban_type === 'SHADOW' || checkBan.ban_type === 'FULL') {
-                        
-                        // Opzionale: Mandiamo un messaggio SOLO a lui per dirgli che è bloccato
-                        // (Se vuoi il vero "Shadowban" dove lui scrive e nessuno legge, rimuovi queste 3 righe sotto)
                         socket.emit('new_message', {
-                            id: 'system-error',
-                            autore: 'SYSTEM',
-                            testo: '⛔ Sei in modalità SPETTATORE (Shadowban). Non puoi inviare messaggi.',
-                            tipo: 'errore', // Assicurati che il frontend gestisca il tipo o usa un colore diverso
-                            timestamp: new Date()
+                            id: 'system-error', autore: 'SYSTEM', testo: '⛔ Sei in modalità SPETTATORE (Shadowban).',
+                            tipo: 'errore', timestamp: new Date()
                         });
-
-                        return; // STOP! Il codice si ferma qui. Niente EXP, niente messaggio agli altri.
+                        return; 
                     }
                 }
-            } catch (err) {
-                console.error("Errore controllo ban chat:", err);
-            }
+            } catch (err) { console.error("Errore controllo ban chat:", err); }
 
-            // 2. CODICE NORMALE (Se non è bannato, prosegue qui...)
-            const messageData = { 
-                ...data, 
-                autore: userProfile.nome_pg, 
-                permesso: userProfile.permesso, 
-                avatar_url: userProfile.avatar_chat 
-            };
+            const messageData = { ...data, autore: userProfile.nome_pg, permesso: userProfile.permesso, avatar_url: userProfile.avatar_chat };
 
-            // Logica EXP (semplificata)
             if (messageData.tipo === 'azione') {
                 const textLength = messageData.testo.length;
                 const expGained = Math.floor(textLength / 500) * 2;
                 if (expGained > 0) {
                      try {
-                        await db('utenti')
-                            .where('id_utente', socket.utente.id)
-                            .update({ 
-                                exp: db.raw('exp + ?', [expGained]), 
-                                exp_accumulata: db.raw('exp_accumulata + ?', [expGained]) 
-                            });
+                        await db('utenti').where('id_utente', socket.utente.id)
+                            .update({ exp: db.raw('exp + ?', [expGained]), exp_accumulata: db.raw('exp_accumulata + ?', [expGained]) });
                      } catch(e) { console.error("Errore EXP", e); }
                 }
             }
 
             try {
                 await db('chat_log').insert({ 
-                    chat_id: messageData.chatId, 
-                    autore: messageData.autore, 
-                    permesso: messageData.permesso, 
-                    testo: messageData.testo, 
-                    tipo: messageData.tipo, 
-                    quest_id: messageData.quest_id, 
-                    luogo: messageData.luogo 
+                    chat_id: messageData.chatId, autore: messageData.autore, permesso: messageData.permesso, 
+                    testo: messageData.testo, tipo: messageData.tipo, quest_id: messageData.quest_id, luogo: messageData.luogo 
                 }); 
             } catch (dbError) { console.error("Errore salvataggio messaggio:", dbError); }
-                
             io.to(messageData.chatId).emit('new_message', messageData);
         });
         
-        // --- LANCIO DADI (Con protezione Shadowban) ---
         socket.on('roll_dice', async (data) => {
             const { chatId, diceType } = data;
-
-            // 1. CONTROLLO BAN
             try {
-                const checkBan = await db('utenti')
-                    .select('ban_expires_at', 'ban_type')
-                    .where('id_utente', socket.utente.id)
-                    .first();
-
+                const checkBan = await db('utenti').select('ban_expires_at', 'ban_type').where('id_utente', socket.utente.id).first();
                 if (checkBan && checkBan.ban_expires_at && new Date(checkBan.ban_expires_at) > new Date()) {
                     if (checkBan.ban_type === 'SHADOW' || checkBan.ban_type === 'FULL') {
-                        socket.emit('new_message', {
-                            id: 'sys-err',
-                            autore: 'SYSTEM',
-                            testo: '⛔ Sei in modalità SPETTATORE. Non puoi lanciare dadi.',
-                            tipo: 'errore',
-                            timestamp: new Date()
-                        });
-                        return; // STOP
+                        socket.emit('new_message', { id: 'sys-err', autore: 'SYSTEM', testo: '⛔ Sei in modalità SPETTATORE.', tipo: 'errore', timestamp: new Date() });
+                        return; 
                     }
                 }
             } catch (err) { console.error("Errore ban dadi:", err); }
 
-            // 2. LOGICA DADO
             if (!chatId || !diceType) return;
-
             const result = Math.floor(Math.random() * diceType) + 1;
             const diceText = `lancia un d${diceType} e ottiene: ${result}`;
+            const messageData = { chatId, autore: userProfile.nome_pg, permesso: userProfile.permesso, avatar_url: userProfile.avatar_chat, testo: diceText, tipo: 'dado', timestamp: new Date() };
 
-            const messageData = {
-                chatId, // Importante: deve essere passato dal frontend
-                autore: userProfile.nome_pg,
-                permesso: userProfile.permesso,
-                avatar_url: userProfile.avatar_chat,
-                testo: diceText,
-                tipo: 'dado',
-                timestamp: new Date()
-            };
-
-            // 3. SALVATAGGIO DB
             try {
-                await db('chat_log').insert({
-                    chat_id: messageData.chatId,
-                    autore: messageData.autore,
-                    permesso: messageData.permesso,
-                    testo: messageData.testo,
-                    tipo: messageData.tipo
-                });
+                await db('chat_log').insert({ chat_id: messageData.chatId, autore: messageData.autore, permesso: messageData.permesso, testo: messageData.testo, tipo: messageData.tipo });
             } catch (dbError) { console.error("Errore salvataggio dado:", dbError); }
-
-            // 4. INVIO A TUTTI
             io.to(chatId).emit('new_message', messageData);
         });
 
         socket.on('send_private_message', async ({ receiverId, text }) => {
-    
-            // --- [AGGIUNGI QUESTO BLOCCO DI SICUREZZA] ---
             try {
-                const checkBan = await db('utenti')
-                    .select('ban_expires_at', 'ban_type')
-                    .where('id_utente', socket.utente.id)
-                    .first();
-        
+                const checkBan = await db('utenti').select('ban_expires_at', 'ban_type').where('id_utente', socket.utente.id).first();
                 if (checkBan && checkBan.ban_expires_at && new Date(checkBan.ban_expires_at) > new Date()) {
                     if (checkBan.ban_type === 'SHADOW' || checkBan.ban_type === 'FULL') {
-                        // Avvisiamo solo lui che non può inviare
-                        socket.emit('private_message_sent', { 
-                            error: true,
-                            text: "⛔ Sei in modalità SPETTATORE. Non puoi inviare messaggi privati." 
-                        });
-                        return; // STOP! Il messaggio non viene salvato né inviato.
+                        socket.emit('private_message_sent', { error: true, text: "⛔ Sei in modalità SPETTATORE." });
+                        return; 
                     }
                 }
-            } catch (err) {
-                console.error("Errore controllo ban PM:", err);
-            }
-            // ----------------------------------------------
+            } catch (err) { console.error("Errore controllo ban PM:", err); }
+
             const senderId = socket.utente.id;
             const [messageIdResult] = await db('private_messages').insert({ sender_id: senderId, receiver_id: receiverId, text: text }).returning('id');
             const messageId = (typeof messageIdResult === 'object') ? messageIdResult.id : messageIdResult;
@@ -2561,16 +1834,9 @@ io.on('connection', async (socket) => {
         socket.on('disconnect', () => {
             if (userProfile && userProfile.nome_pg) {
                 console.log(`❌ Disconnesso: ${userProfile.nome_pg}`);
-                // Nota: Non cancelliamo da userSockets se ha altre schede aperte, 
-                // ma per ora va bene così, il problema visivo è la priorità.
                 delete onlineUsers[socket.id];
-                
-                // Usiamo la stessa logica di deduplicazione di prima
                 const uniqueMap = new Map();
-                Object.values(onlineUsers).forEach(u => {
-                    if (u && u.id) uniqueMap.set(u.id, u);
-                });
-                
+                Object.values(onlineUsers).forEach(u => { if (u && u.id) uniqueMap.set(u.id, u); });
                 io.emit('update_online_list', Array.from(uniqueMap.values()));
             }
         });
@@ -2586,41 +1852,25 @@ io.on('connection', async (socket) => {
 // --- FINE ROTTE API ---
 // =================================================================
 
-// 1. Definiamo i percorsi
-const frontendDist = path.join(__dirname, '../gdr-frontend/dist');
-const indexFile = path.join(frontendDist, 'index.html');
-
-console.log("📂 PERCORSO FRONTEND:", frontendDist);
-
-// 2. Serviamo i file statici (JS, CSS, Immagini)
+// 1. GESTIONE FRONTEND + CATCH-ALL (Compatibile Express 4)
 if (require('fs').existsSync(frontendDist)) {
-    // 'fallthrough: true' dice a Express: se non trovi il file, non dare 404, passa al prossimo blocco!
-    app.use(express.static(frontendDist, { fallthrough: true }));
+    app.use(express.static(frontendDist));
 }
 
-// 3. IL "CATCH-ALL" BLINDATO (Middleware Puro)
-// IMPORTANTE: Usiamo app.use() SENZA percorsi. 
-// Questo evita che Express 5 provi ad analizzare l'URL e crashi.
-app.use((req, res, next) => {
+// In Express 4, l'asterisco '*' FUNZIONA e non fa crashare nulla.
+app.get('*', (req, res) => {
     
-    // Se è una chiamata API o Socket che non esiste, diamo il vero 404 JSON
+    // Se chiedono un'API che non esiste -> 404
     if (req.url.startsWith('/api') || req.url.startsWith('/socket.io')) {
-        return res.status(404).json({ error: "API Endpoint non trovato" });
+        return res.status(404).json({ error: "API non trovata" });
     }
 
-    // Se è un browser che cerca una pagina (GET), mandiamo index.html
-    if (req.method === 'GET') {
-        console.log(`🔄 SPA REWRITE: ${req.url} -> index.html`);
-        return res.sendFile(indexFile, (err) => {
-            if (err) {
-                console.error("❌ ERRORE INVIO INDEX:", err);
-                if (!res.headersSent) res.status(500).send("Errore Server Frontend");
-            }
-        });
+    // Altrimenti manda index.html
+    if (require('fs').existsSync(indexFile)) {
+        res.sendFile(indexFile);
+    } else {
+        res.status(500).send("Errore: Frontend build non trovata.");
     }
-
-    // Per tutto il resto, prosegui
-    next();
 });
 
 // =================================================================
@@ -2629,14 +1879,7 @@ app.use((req, res, next) => {
 (async () => {
     try {
         await db.raw('SELECT 1');
-        console.log(`✅ DATABASE CONNESSO.`);
-        
-        httpServer.listen(port, () => {
-            console.log(`🚀 SERVER AVVIATO sulla porta ${port}`);
-            console.log(`👉 Pronto a servire il frontend da: ${frontendDist}`);
-        });
-    } catch (errore) {
-        console.error("❌ ERRORE AVVIO:", errore);
-        process.exit(1);
-    }
+        console.log(`✅ DB CONNESSO.`);
+        httpServer.listen(port, () => console.log(`🚀 SERVER (Express 4) SU PORTA ${port}`));
+    } catch (e) { console.error("❌ ERRORE AVVIO:", e); }
 })();
