@@ -639,20 +639,20 @@ const gestisciAggiornamentoProfilo = async (req, res) => {
 app.put('/api/scheda/profilo', verificaToken, gestisciAggiornamentoProfilo);
 app.post('/api/scheda/profilo', verificaToken, gestisciAggiornamentoProfilo);
 
-// BANNER
-app.get('/api/active-event', async (req, res) => {
+// BANNER (Supporta sia active-event che active-banner per sicurezza)
+app.get(['/api/active-event', '/api/active-banner'], async (req, res) => {
     try {
         const event = await db('events')
             .where({ is_active: 1 })
             .first();
 
+        // Restituisce l'evento o null (senza crashare)
         res.json(event || null);
     } catch (e) {
         console.error("Errore evento attivo:", e);
         res.status(500).json({ message: "Errore recupero evento attivo." });
     }
 });
-
 
 // CHAT HISTORY
 app.get('/api/chat/:chatId/history', verificaToken, async (req, res) => {
