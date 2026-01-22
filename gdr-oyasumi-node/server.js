@@ -16,6 +16,7 @@ const ytdl = require('ytdl-core');
 const axios = require('axios');
 const knex = require('knex');
 const knexConfig = require('./knexfile');
+const path = require('path');
 
 // =====================================================
 // --- 2. AMBIENTE & DATABASE ---
@@ -2540,13 +2541,13 @@ io.on('connection', async (socket) => {
 // ===============================
 // SERVE FRONTEND REACT (RENDER)
 // ===============================
-const path = require('path');
 
-// path alla build di Vite
+// Middleware per servire i file statici dalla cartella dist
 app.use(express.static(path.join(__dirname, '../gdr-frontend/dist')));
 
-// catch-all: qualsiasi rotta non-API va a React
-app.get(/^(?!\/api).*/, (req, res) => {
+// Rotta catch-all: qualsiasi rotta non-API restituisce index.html
+// Questa rotta DEVE essere dopo tutte le rotte /api ma prima dell'avvio del server
+app.get('*', (req, res) => {
     res.sendFile(
         path.join(__dirname, '../gdr-frontend/dist/index.html')
     );
