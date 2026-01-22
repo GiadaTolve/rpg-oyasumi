@@ -2536,7 +2536,10 @@ io.on('connection', async (socket) => {
         console.error("Errore critico socket:", e);
         socket.disconnect();
     }
-});// =============================================
+});
+
+
+// =============================================
 // SERVE FRONTEND REACT (RENDER) - FIX DEFINITIVO
 // =============================================
 
@@ -2564,24 +2567,19 @@ const finalPath = getFrontendPath();
 app.use(express.static(finalPath));
 
 // 2. GESTIONE ROTTE (Compatibile Node 22)
-// Usiamo la stringa '*' invece della Regex che causava il TypeError
+// Usiamo la stringa '*' semplice e filtriamo manualmente le chiamate API
 app.get('*', (req, res, next) => {
-    // Se la richiesta inizia con /api, la passiamo alle rotte sopra
+    // Se la richiesta inizia con /api, la passiamo alle rotte API definite sopra
     if (req.originalUrl.startsWith('/api')) {
         return next();
     }
     // Per tutte le altre (es: /gestione, /forum), mandiamo l'index.html
     res.sendFile(path.join(finalPath, 'index.html'), (err) => {
         if (err) {
-            console.error("❌ Errore sendFile:", err);
-            res.status(500).send("Errore nel caricamento del frontend.");
+            console.error("❌ Errore invio index.html:", err);
+            res.status(500).send("Errore nel caricamento del gioco.");
         }
     });
-});
-
-// 3. Fallback per API non esistenti
-app.use('/api', (req, res) => {
-    res.status(404).json({ message: "Endpoint API non trovato." });
 });
 
 // --- 5. AVVIO SERVER ---
