@@ -192,8 +192,28 @@ function NewTopicForm({ bachecaId, onTopicCreated, onCancel }) {
                             
                             <span style={{borderLeft:'1px solid #444', margin:'0 5px'}}></span>
                             
-                            <button type="button" style={styles.toolBtn} onMouseEnter={btnHover} onMouseLeave={btnOut} onClick={() => insertTag('[color=red]', '[/color]')} title="Colore Rosso" style={{color:'red', ...styles.toolBtn}}>A</button>
-                            <button type="button" style={styles.toolBtn} onMouseEnter={btnHover} onMouseLeave={btnOut} onClick={() => insertTag('[color=#a270ff]', '[/color]')} title="Colore Viola" style={{color:'#a270ff', ...styles.toolBtn}}>A</button>
+                            {/* --- FIX: ATTRIBUTI STYLE UNIFICATI PER COMPATIBILITÀ VITE --- */}
+                            <button 
+                                type="button" 
+                                onMouseEnter={btnHover} 
+                                onMouseLeave={btnOut} 
+                                onClick={() => insertTag('[color=red]', '[/color]')} 
+                                title="Colore Rosso" 
+                                style={{ ...styles.toolBtn, color: 'red' }}
+                            >
+                                A
+                            </button>
+                            
+                            <button 
+                                type="button" 
+                                onMouseEnter={btnHover} 
+                                onMouseLeave={btnOut} 
+                                onClick={() => insertTag('[color=#a270ff]', '[/color]')} 
+                                title="Colore Viola" 
+                                style={{ ...styles.toolBtn, color: '#a270ff' }}
+                            >
+                                A
+                            </button>
                         </div>
 
                         <textarea 
