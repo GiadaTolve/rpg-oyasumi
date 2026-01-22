@@ -891,18 +891,49 @@ app.post('/api/admin/locations', verificaToken, verificaMod, async (req, res) =>
     }
 });
 
+a// [PUT] AGGIORNAMENTO LOCATION (MAPPA/CHAT) DA ADMIN
 app.put('/api/admin/locations/:id', verificaToken, verificaMod, async (req, res) => {
     const { id } = req.params;
+    
+    // Estraiamo solo i campi che il database possiede realmente
+    // Questo evita errori se il frontend manda dati extra (come i figli della mappa)
+    const { 
+        name, 
+        image_url, 
+        description, 
+        pos_x, 
+        pos_y, 
+        prefecture, 
+        type, 
+        parent_id 
+    } = req.body;
 
     try {
-        await db('locations')
-            .where({ id })
-            .update(req.body);
+        const updateData = {
+            name,
+            image_url,
+            description,
+            pos_x: pos_x ? Number(pos_x) : null,
+            pos_y: pos_y ? Number(pos_y) : null,
+            prefecture,
+            type,
+            parent_id: parent_id || null
+        };
 
-        res.json({ message: "Location aggiornata." });
+        const result = await db('locations')
+            .where({ id })
+            .update(updateData);
+
+        if (result === 0) {
+            return res.status(404).json({ message: "Location non trovata." });
+        }
+
+        console.log(`🗺️ Mappa/Chat aggiornata: ID ${id} (${name})`);
+        res.json({ message: "Modifiche salvate con successo!" });
+
     } catch (error) {
-        console.error("❌ Errore UPDATE location:", error);
-        res.status(500).json({ message: "Errore aggiornamento location." });
+        console.error("❌ ERRORE AGGIORNAMENTO MAPPA:", error);
+        res.status(500).json({ message: "Errore durante il salvataggio della mappa." });
     }
 });
 
