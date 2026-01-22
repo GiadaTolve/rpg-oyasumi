@@ -2541,6 +2541,7 @@ io.on('connection', async (socket) => {
     }
 });
 
+
 // =============================================
 // SERVE FRONTEND REACT (RENDER) - FIX EXPRESS 5 + NODE 22
 // =============================================
@@ -2598,22 +2599,6 @@ if (finalPath) {
         console.log(`✅ Connessione al database riuscita.`);
         httpServer.listen(port, () => {
             console.log(`🚀 Server avviato su porta ${port}`);
-        });
-    } catch (errore) {
-        console.error("ERRORE CRITICO AVVIO SERVER:", errore);
-        process.exit(1);
-    }
-})();
-
-
-
-// --- 5. AVVIO SERVER ---
-(async () => {
-    try {
-        await db.raw('SELECT 1');
-        console.log(`✅ Connessione al database riuscita.`);
-        httpServer.listen(port, () => {
-            console.log(`🚀 Server avviato su porta ${port} in modalità ${environment}`);
         });
     } catch (errore) {
         console.error("ERRORE CRITICO AVVIO SERVER:", errore);
